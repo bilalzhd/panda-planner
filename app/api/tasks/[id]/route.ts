@@ -1,0 +1,42 @@
+import { prisma } from '@/lib/prisma'
+import { taskSchema } from '@/lib/validators'
+import { NextRequest } from 'next/server'
+import { requireUser, teamIdsForUser } from '@/lib/tenant'
+
+type Params = { params: { id: string } }
+
+export async function GET(_req: NextRequest, { params }: Params) {
+  const { user } = await requireUser()
+  const teamIds = await teamIdsForUser(user.id)
+  const task = await prisma.task.findFirst({
+    where: { id: params.id, project: { teamId: { in: teamIds } } },
+    include: { project: true, assignedTo: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
+  })
+  if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
+  return Response.json(task)
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const { user } = await requireUser()
+  const teamIds = await teamIdsForUser(user.id)
+  const existing = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
+  const body = await req.json()
+  const parsed = taskSchema.partial().safeParse(body)
+  if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
+  const { dueDate, ...rest } = parsed.data
+  const task = await prisma.task.update({
+    where: { id: params.id },
+    data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
+  })
+  return Response.json(task)
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { user } = await requireUser()
+  const teamIds = await teamIdsForUser(user.id)
+  const existing = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
+  await prisma.task.delete({ where: { id: params.id } })
+  return new Response(null, { status: 204 })
+}

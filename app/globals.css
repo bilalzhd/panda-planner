@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* App-wide utility and reset extensions */
+:root {
+  --background: #0b0d12;
+  --foreground: #e7e9ee;
+}
+
+html, body, #__next {
+  height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.container {
+  @apply max-w-6xl mx-auto px-4;
+}
+

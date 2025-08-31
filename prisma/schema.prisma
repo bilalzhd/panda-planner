@@ -1,0 +1,235 @@
+// Prisma schema capturing Projects, Tasks, Timesheets, Comments, Attachments
+// Assumptions:
+// - Task recurrence supports DAILY, WEEKLY, MONTHLY with optional interval & byWeekday
+// - Attachments stored locally under /public/uploads; only path + metadata in DB
+// - NextAuth models per Prisma adapter defaults
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model User {
+  id            String      @id @default(cuid())
+  clerkId       String?     @unique // nullable until first sync with Clerk
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+
+  tasksAssigned Task[]      @relation("TasksAssigned")
+  timesheets    Timesheet[]
+  comments      Comment[]
+  attachments   Attachment[] @relation("AttachmentsUploaded")
+
+  teamsOwned    Team[]      @relation("TeamOwner")
+  memberships   Membership[]
+  invitesSent   TeamInvite[] @relation("InvitedBy")
+  schedules     TaskSchedule[]
+
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+  team        Team     @relation(fields: [teamId], references: [id])
+  teamId      String
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Task {
+  id          String         @id @default(cuid())
+  project     Project        @relation(fields: [projectId], references: [id])
+  projectId   String
+  parent      Task?          @relation("Subtasks", fields: [parentId], references: [id])
+  parentId    String?
+  children    Task[]         @relation("Subtasks")
+  title       String
+  description String?
+  assignedTo  User?          @relation("TasksAssigned", fields: [assignedToId], references: [id])
+  assignedToId String?
+  dueDate     DateTime?
+  recurring   Boolean        @default(false)
+  frequency   RecurrenceFrequency?
+  interval    Int?           // every N units (e.g., every 2 weeks)
+  byWeekday   Int?           // 0-6 (Sunday-Saturday) for weekly frequency
+  priority    TaskPriority   @default(MEDIUM)
+  status      TaskStatus     @default(TODO)
+  comments    Comment[]
+  attachments Attachment[]
+  timesheets  Timesheet[]
+  schedules   TaskSchedule[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Timesheet {
+  id       String   @id @default(cuid())
+  task     Task     @relation(fields: [taskId], references: [id])
+  taskId   String
+  user     User     @relation(fields: [userId], references: [id])
+  userId   String
+  hours    Decimal  @db.Decimal(5,2)
+  notes    String?
+  date     DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Schedule rules to surface tasks in the timesheet grid automatically
+model TaskSchedule {
+  id             String               @id @default(cuid())
+  task           Task                 @relation(fields: [taskId], references: [id])
+  taskId         String
+  user           User                 @relation(fields: [userId], references: [id])
+  userId         String
+  isRecurring    Boolean              @default(false)
+  frequency      RecurrenceFrequency?
+  byWeekday      Int?                 // 0-6 if weekly
+  timeOfDay      String?              // 'HH:MM' 24h
+  durationMin    Int?                 // suggested duration in minutes
+  date           DateTime?            // one-off date
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id])
+  taskId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id])
+  taskId    String
+  filename  String
+  url       String     // e.g., /uploads/... relative path
+  size      Int
+  mimeType  String
+  uploadedBy User?     @relation("AttachmentsUploaded", fields: [uploadedById], references: [id])
+  uploadedById String?
+  createdAt DateTime @default(now())
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+model Team {
+  id        String       @id @default(cuid())
+  name      String
+  owner     User         @relation("TeamOwner", fields: [ownerId], references: [id])
+  ownerId   String
+  projects  Project[]
+  members   Membership[]
+  invites   TeamInvite[]
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id])
+  teamId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  @@unique([teamId, userId])
+}
+
+model TeamInvite {
+  id          String        @id @default(cuid())
+  team        Team          @relation(fields: [teamId], references: [id])
+  teamId      String
+  email       String
+  token       String        @unique
+  status      InviteStatus  @default(PENDING)
+  invitedBy   User          @relation("InvitedBy", fields: [invitedById], references: [id])
+  invitedById String
+  expiresAt   DateTime
+  createdAt   DateTime      @default(now())
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
