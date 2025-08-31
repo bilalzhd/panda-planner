@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <Link href="/dashboard">Dashboard</Link>
                 <Link href="/timesheets">Timesheets</Link>
                 <SignedOut>
-                  <SignInButton afterSignInUrl="/dashboard" mode="modal">
+                  <SignInButton mode="modal">
                     <button className="rounded-md border border-white/10 bg-white/10 px-3 py-1 text-sm">Sign In</button>
                   </SignInButton>
                 </SignedOut>

@@ -8,7 +8,7 @@ export default function LandingPage() {
       <p className="mt-4 text-white/80">Lightweight Task & Project Management for digital marketing and web agencies.</p>
       <div className="mt-8 flex items-center justify-center gap-3">
         <SignedOut>
-          <SignInButton afterSignInUrl="/dashboard" mode="modal">
+          <SignInButton mode="modal">
             <button className="rounded-md bg-white text-black px-4 py-2 text-sm font-medium">Get Started</button>
           </SignInButton>
         </SignedOut>

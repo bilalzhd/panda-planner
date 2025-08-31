@@ -15,13 +15,15 @@ export async function GET(req: NextRequest) {
 
   const timesheets = await prisma.timesheet.findMany({
     where: {
-      task: { project: { teamId: { in: teamIds } } },
+      task: {
+        project: { teamId: { in: teamIds } },
+        ...(projectId ? { projectId } : {}),
+      },
       userId,
       date: {
         gte: from ? new Date(from) : undefined,
         lte: to ? new Date(to) : undefined,
       },
-      task: projectId ? { projectId } : undefined,
     },
     include: { task: { include: { project: true } }, user: true },
     orderBy: { date: 'asc' },

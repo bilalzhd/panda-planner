@@ -18,7 +18,7 @@ async function main() {
   })
 
   const project = await prisma.project.upsert({
-    where: { name: 'Edvardson' },
+    where: { id: "cmezqamha003c8zruhkg1lw8g", name: 'Edvardson' },
     update: {},
     create: {
       name: 'Edvardson',
