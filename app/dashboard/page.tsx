@@ -1,12 +1,10 @@
 import { prisma } from '@/lib/prisma'
-import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { TaskCard } from '@/components/task-card'
 import { KanbanBoard } from '@/components/kanban-board'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { Progress } from '@/components/ui/progress'
 import { InviteForm } from '@/components/invite-form'
-import { Button } from '@/components/ui/button'
 
 async function getData() {
   const { user } = await requireUser()

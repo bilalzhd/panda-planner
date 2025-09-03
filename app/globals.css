@@ -4,8 +4,14 @@
 
 /* App-wide utility and reset extensions */
 :root {
-  --background: #0b0d12;
+  --background: #0b0d12; /* dark default */
   --foreground: #e7e9ee;
+}
+
+/* Light theme variables */
+.theme-light {
+  --background: #f7fafc; /* slate-50-ish */
+  --foreground: #0b0d12; /* near-black */
 }
 
 html, body, #__next {
@@ -21,3 +27,37 @@ body {
   @apply max-w-6xl mx-auto px-4;
 }
 
+/* Light theme overrides for common utility classes used in the app */
+.theme-light .border-white\/10 { border-color: rgba(0,0,0,0.12) !important; }
+.theme-light .bg-white\/\[0\.03\] { background-color: rgba(0,0,0,0.03) !important; }
+.theme-light .bg-white\/5 { background-color: rgba(0,0,0,0.05) !important; }
+.theme-light .bg-white\/10 { background-color: rgba(0,0,0,0.10) !important; }
+.theme-light .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02) !important; }
+.theme-light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.08) !important; }
+.theme-light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.04) !important; }
+.theme-light .text-white\/80 { color: rgba(0,0,0,0.80) !important; }
+.theme-light .text-white\/70 { color: rgba(0,0,0,0.70) !important; }
+.theme-light .text-white\/60 { color: rgba(0,0,0,0.60) !important; }
+.theme-light .text-white\/50 { color: rgba(0,0,0,0.50) !important; }
+.theme-light .text-white\/40 { color: rgba(0,0,0,0.40) !important; }
+.theme-light .border-b.border-white\/10 { border-bottom-color: rgba(0,0,0,0.12) !important; }
+.theme-light .border-r.border-white\/10 { border-right-color: rgba(0,0,0,0.12) !important; }
+.theme-light .border.border-white\/10 { border-color: rgba(0,0,0,0.12) !important; }
+.theme-light .border.border-white\/20 { border-color: rgba(0,0,0,0.20) !important; }
+.theme-light .text-white { color: #0b0d12 !important; }
+.theme-light .hover\:text-white:hover { color: #111827 !important; }
+.theme-light .ring-white { --tw-ring-color: rgba(0,0,0,0.75) !important; }
+
+/* Form field readability in light theme */
+.theme-light input,
+.theme-light textarea,
+.theme-light select {
+  color: var(--foreground) !important;
+}
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: rgba(0,0,0,0.45) !important;
+}
+
+/* Specific dark-bg panels/dialogs */
+.theme-light .bg-\[\#12151b\] { background-color: #ffffff !important; color: #0b0d12 !important; }

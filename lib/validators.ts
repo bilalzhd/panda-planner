@@ -38,3 +38,11 @@ export const timesheetSchema = z.object({
 export type ProjectInput = z.infer<typeof projectSchema>
 export type TaskInput = z.infer<typeof taskSchema>
 export type TimesheetInput = z.infer<typeof timesheetSchema>
+
+export const credentialSchema = z.object({
+  label: z.string().min(1),
+  username: z.string().optional().nullable(),
+  password: z.string().min(1),
+})
+
+export type CredentialInput = z.infer<typeof credentialSchema>

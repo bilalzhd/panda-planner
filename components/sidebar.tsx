@@ -9,7 +9,7 @@ import { PROJECT_COLOR_OPTIONS } from '@/lib/validators'
 
 type Project = { id: string; name: string; color?: string | null }
 
-export function Sidebar() {
+export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -51,15 +51,16 @@ export function Sidebar() {
     return pathname === href
   }
 
-  return (
-    <aside className="hidden md:flex md:w-64 lg:w-72 shrink-0 border-r border-white/10 bg-white/[0.03]">
-      <div className="flex h-[calc(100vh-56px)] flex-col gap-4 p-4 w-full">
+  const content = (
+      <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-4 p-4 w-full`}>
         <div className="text-lg font-semibold px-1">TaskFlow</div>
         <nav className="flex flex-col gap-1">
           <SideLink href="/dashboard" active={isActive('/dashboard')}>Dashboard</SideLink>
           <SideLink href="/projects" active={isActive('/projects')}>Projects</SideLink>
           <SideLink href="/tasks" active={isActive('/tasks')}>All Tasks</SideLink>
           <SideLink href="/timesheets" active={isActive('/timesheets')}>Timesheets</SideLink>
+          <SideLink href="/credentials" active={isActive('/credentials')}>Credentials</SideLink>
+          <SideLink href="/settings/pin" active={isActive('/settings/pin')}>PIN Settings</SideLink>
           <SideLink href="/team" active={isActive('/team')}>Team</SideLink>
         </nav>
         <div className="mt-4 text-xs uppercase tracking-wide text-white/50 px-1">Projects</div>
@@ -100,6 +101,14 @@ export function Sidebar() {
           </DialogFooter>
         </Dialog>
       </div>
+  )
+
+  if (embedded) {
+    return <div className="w-72 max-w-full">{content}</div>
+  }
+  return (
+    <aside className="hidden md:flex md:w-64 lg:w-72 shrink-0 border-r border-white/10 bg-white/[0.03]">
+      {content}
     </aside>
   )
 }

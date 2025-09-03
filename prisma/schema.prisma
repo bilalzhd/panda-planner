@@ -38,6 +38,8 @@ model User {
   email         String?     @unique
   emailVerified DateTime?
   image         String?
+  // Hashed PIN used to reveal credentials (format: salt:hash, using scrypt)
+  credentialsPinHash String?
 
   tasksAssigned Task[]      @relation("TasksAssigned")
   timesheets    Timesheet[]
@@ -63,8 +65,20 @@ model Project {
   team        Team     @relation(fields: [teamId], references: [id])
   teamId      String
   tasks       Task[]
+  credentials Credential[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Credential {
+  id         String   @id @default(cuid())
+  project    Project  @relation(fields: [projectId], references: [id])
+  projectId  String
+  label      String   // e.g., "Google", "Website"
+  username   String?
+  secretEnc  String   @db.Text // AES-GCM encrypted secret
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Task {

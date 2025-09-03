@@ -6,6 +6,7 @@ import { TaskStatus } from '@prisma/client'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { ProjectBoard } from '@/components/project-board'
+import { CredentialsPanel } from '@/components/credentials-panel'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
@@ -30,6 +31,8 @@ export default async function ProjectPage({ params }: { params: { id: string } }
       </div>
 
       <ProjectBoard projectId={project.id} initialTasks={project.tasks as any} />
+
+      <CredentialsPanel projectId={project.id} />
     </div>
   )
 }
