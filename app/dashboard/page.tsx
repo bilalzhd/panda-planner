@@ -4,7 +4,6 @@ import { TaskCard } from '@/components/task-card'
 import { KanbanBoard } from '@/components/kanban-board'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { Progress } from '@/components/ui/progress'
-import { InviteForm } from '@/components/invite-form'
 
 async function getData() {
   const { user } = await requireUser()
@@ -94,14 +93,7 @@ export default async function DashboardPage() {
         <KanbanBoard tasks={allTasks as any} />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="font-semibold">Invite a teammate</CardHeader>
-          <CardContent>
-            <InviteForm teamId={personalTeam.id} />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Invite form moved to Team page */}
     </div>
   )
 }

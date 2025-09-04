@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import Link from 'next/link'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { InviteForm } from '@/components/invite-form'
 
 export default async function TeamPage({ searchParams }: { searchParams: { teamId?: string; accepted?: string } }) {
   const { user } = await requireUser()
@@ -42,6 +44,15 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
         {memberships.map((m) => (
           <Link key={m.teamId} href={`/team?teamId=${m.teamId}`} className={`rounded-md border px-2 py-1 ${m.teamId === currentTeamId ? 'border-white bg-white text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>{m.team.name}</Link>
         ))}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="font-semibold">Invite a teammate</CardHeader>
+          <CardContent>
+            <InviteForm teamId={currentTeamId} />
+          </CardContent>
+        </Card>
       </div>
 
       <ul className="space-y-4">
