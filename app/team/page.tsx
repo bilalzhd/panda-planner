@@ -3,6 +3,7 @@ import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { InviteForm } from '@/components/invite-form'
+import { RemoveMemberButton } from '@/components/remove-member-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,6 +76,10 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
                     <div className="text-xs text-white/60">{myTasks.length} assigned tasks</div>
                   </div>
                 </div>
+                {/* Owner can remove non-owner members */}
+                {user.id === currentTeam.ownerId && m.userId !== currentTeam.ownerId && (
+                  <RemoveMemberButton teamId={currentTeamId} userId={m.userId} />
+                )}
               </div>
               {myTasks.length > 0 && (
                 <div className="mt-3 grid md:grid-cols-2 gap-2">
