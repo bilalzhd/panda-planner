@@ -1,12 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { taskSchema } from '@/lib/validators'
-import { TaskStatus } from '@prisma/client'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
-import { revalidatePath } from 'next/cache'
 import { ProjectBoard } from '@/components/project-board'
 import { CredentialsPanel } from '@/components/credentials-panel'
+import { ProjectMedia } from '@/components/project-media'
 import { DeleteProject } from '@/components/delete-project'
 
 export const dynamic = 'force-dynamic'
@@ -48,9 +45,19 @@ export default async function ProjectPage({ params }: { params: { id: string } }
   const project = await getProject(params.id)
   const { user } = await requireUser()
   const startOfToday = new Date(new Date().toDateString())
-  const overdueYours = project.tasks
-    .filter((t: any) => t.assignedToId === user.id && t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < startOfToday)
-    .sort((a: any, b: any) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
+  const prRank = (p?: string | null) => (p === 'HIGH' ? 0 : p === 'MEDIUM' ? 1 : 2)
+  const ownRank = (t: any) => (t.assignedToId === user.id ? 0 : 1)
+  const overdueAll = (project.tasks as any[])
+    .filter((t) => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < startOfToday)
+    .sort((a, b) => {
+      const pa = prRank(a.priority)
+      const pb = prRank(b.priority)
+      if (pa !== pb) return pa - pb
+      const oa = ownRank(a)
+      const ob = ownRank(b)
+      if (oa !== ob) return oa - ob
+      return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()
+    })
 
   const hex = colorToHex(project.color)
   const { r, g, b } = hexToRgb(hex)
@@ -73,13 +80,16 @@ export default async function ProjectPage({ params }: { params: { id: string } }
           </h1>
           <DeleteProject projectId={project.id} projectName={project.name} />
         </div>
-        {overdueYours.length > 0 && (
+        {overdueAll.length > 0 && (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-2 text-sm font-semibold">Overdue Tasks</div>
             <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {overdueYours.slice(0, 9).map((t: any) => (
+              {overdueAll.slice(0, 9).map((t: any) => (
                 <li key={t.id} className="rounded-md border border-white/10 bg-white/5 p-3 text-sm">
-                  <div className="font-medium">{t.title}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{t.title}</div>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${t.priority === 'HIGH' ? 'bg-rose-500/20 text-rose-200' : t.priority === 'MEDIUM' ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>{t.priority}</span>
+                  </div>
                   <div className="text-xs text-white/60">Due {new Date(t.dueDate).toLocaleDateString()}</div>
                 </li>
               ))}
@@ -87,6 +97,8 @@ export default async function ProjectPage({ params }: { params: { id: string } }
           </div>
         )}
         <ProjectBoard projectId={project.id} initialTasks={project.tasks as any} />
+
+        <ProjectMedia projectId={project.id} limit={3} />
 
         <CredentialsPanel projectId={project.id} />
       </div>
