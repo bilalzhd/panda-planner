@@ -382,7 +382,7 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
       }}
       className={`rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-opacity ${drag ? 'opacity-60' : ''}`}
     >
-      <div className="p-3">
+      <div className="p-3 cursor-pointer">
         <div className="font-medium text-sm">{task.title}</div>
         {task.description && (
           <div className="text-xs text-white/60 line-clamp-2 mt-1">{task.description}</div>

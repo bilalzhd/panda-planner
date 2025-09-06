@@ -10,7 +10,7 @@ export function TaskCard({ task }: { task: Task & { projectId: string } }) {
     HIGH: 'text-rose-300',
   }
   return (
-    <Link href={`/tasks/${task.id}`} draggable onDragStart={(e) => {
+    <Link className='cursor-pointer' href={`/tasks/${task.id}`} draggable onDragStart={(e) => {
       e.dataTransfer.setData('text/task-id', task.id)
       e.dataTransfer.effectAllowed = 'move'
     }}>

@@ -23,7 +23,10 @@ export async function POST(req: Request, { params }: Params) {
       expiresAt,
     },
   })
-  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  // Build an absolute accept URL. Prefer configured base, else derive from request origin.
+  const baseFromEnv = process.env.NEXT_PUBLIC_BASE_URL && process.env.NEXT_PUBLIC_BASE_URL.trim()
+  const origin = new URL(req.url).origin
+  const base = baseFromEnv || origin
   const acceptUrl = `${base}/api/invites/accept?token=${token}`
   let mailSent = false
   let mailError: any = null
