@@ -19,14 +19,18 @@ export function getPublicUrl(path: string) {
 export async function ensureBucketExists() {
   const supabase = getSupabaseAdmin()
   const useSigned = ['1','true','TRUE','yes','YES'].includes(String(process.env.SUPABASE_MEDIA_SIGNED || 'false'))
-  // Try creating the bucket idempotently; ignore duplicate errors
-  const { error: createErr } = await supabase.storage.createBucket(MEDIA_BUCKET, { public: !useSigned })
-  if (createErr && !/exists/i.test(String(createErr.message))) {
-    // If creation failed for another reason, probe to confirm existence; otherwise rethrow
-    const probe = await supabase.storage.from(MEDIA_BUCKET).list('', { limit: 1 })
-    // @ts-ignore
-    if (probe?.error && String(probe.error.message).toLowerCase().includes('bucket not found')) {
+  const desiredPublic = !useSigned
+
+  // Ensure bucket exists and its visibility matches desired configuration
+  const { data: bucket } = await supabase.storage.getBucket(MEDIA_BUCKET)
+  if (!bucket) {
+    const { error: createErr } = await supabase.storage.createBucket(MEDIA_BUCKET, { public: desiredPublic })
+    if (createErr && !/exists/i.test(String(createErr.message))) {
       throw createErr
     }
+    return
+  }
+  if (bucket.public !== desiredPublic) {
+    await supabase.storage.updateBucket(MEDIA_BUCKET, { public: desiredPublic })
   }
 }

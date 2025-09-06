@@ -58,7 +58,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   const key = `${params.id}/${randomUUID()}.${ext}`
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(key, buf, { contentType: file.type || 'application/octet-stream', upsert: false })
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json({ path: key, url: getPublicUrl(key), name: file.name, size: file.size, type: file.type })
+  // Return appropriate URL based on visibility (signed vs public)
+  const useSigned = ['1','true','TRUE','yes','YES'].includes(String(process.env.SUPABASE_MEDIA_SIGNED || 'false'))
+  let url = getPublicUrl(key)
+  if (useSigned) {
+    const ttl = Number(process.env.SUPABASE_SIGNED_URL_TTL || 3600)
+    const { data: s } = await supabase.storage.from(MEDIA_BUCKET).createSignedUrl(key, ttl)
+    if (s?.signedUrl) url = s.signedUrl
+  }
+  return Response.json({ path: key, url, name: file.name, size: file.size, type: file.type })
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
