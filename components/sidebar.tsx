@@ -55,13 +55,13 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
       <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-4 p-4 w-full`}>
         <div className="text-lg font-semibold px-1">TaskFlow</div>
         <nav className="flex flex-col gap-1">
-          <SideLink href="/dashboard" active={isActive('/dashboard')}>Dashboard</SideLink>
-          <SideLink href="/projects" active={isActive('/projects')}>Projects</SideLink>
-          <SideLink href="/tasks" active={isActive('/tasks')}>All Tasks</SideLink>
-          <SideLink href="/timesheets" active={isActive('/timesheets')}>Timesheets</SideLink>
-          <SideLink href="/credentials" active={isActive('/credentials')}>Credentials</SideLink>
-          <SideLink href="/settings/pin" active={isActive('/settings/pin')}>PIN Settings</SideLink>
-          <SideLink href="/team" active={isActive('/team')}>Team</SideLink>
+          <SideLink href="/dashboard" active={isActive('/dashboard')} icon={iconDashboard}>Dashboard</SideLink>
+          <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
+          <SideLink href="/tasks" active={isActive('/tasks')} icon={iconTasks}>All Tasks</SideLink>
+          <SideLink href="/timesheets" active={isActive('/timesheets')} icon={iconTimesheets}>Timesheets</SideLink>
+          <SideLink href="/credentials" active={isActive('/credentials')} icon={iconKey}>Credentials</SideLink>
+          <SideLink href="/settings/pin" active={isActive('/settings/pin')} icon={iconLock}>PIN Settings</SideLink>
+          <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
         </nav>
         <div className="mt-4 text-xs uppercase tracking-wide text-white/50 px-1">Projects</div>
         <div className="flex-1 overflow-auto">
@@ -113,9 +113,12 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   )
 }
 
-function SideLink({ href, active, children }: { href: string; active?: boolean; children: React.ReactNode }) {
+function SideLink({ href, active, icon, children }: { href: string; active?: boolean; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <Link href={href} className={`rounded-md px-2 py-1.5 text-sm ${active ? 'bg-white text-black font-medium' : 'hover:bg-white/10'}`}>{children}</Link>
+    <Link href={href} className={`rounded-md px-2 py-1.5 text-sm flex items-center gap-2 ${active ? 'bg-white text-black font-medium' : 'hover:bg-white/10'}`}>
+      {icon && <span className="opacity-80">{icon}</span>}
+      <span>{children}</span>
+    </Link>
   )
 }
 
@@ -133,3 +136,57 @@ function colorToHex(c: string) {
     default: return '#9ca3af'
   }
 }
+
+const iconDashboard = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="13" y="3" width="8" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="13" y="10" width="8" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+    <rect x="3" y="13" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+)
+
+const iconProjects = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+)
+
+const iconTasks = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M9 6h12M9 12h12M9 18h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M5 5l-2 2 1 1 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M5 11l-2 2 1 1 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M5 17l-2 2 1 1 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const iconTimesheets = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const iconKey = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M11 12h9M17 12v4M20 12v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const iconLock = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="11" width="16" height="9" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 11V8a4 4 0 1 1 8 0v3" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+)
+
+const iconTeam = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+    <circle cx="17" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M3 19a5 5 0 0 1 10 0" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M13 19a4 4 0 0 1 8 0" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+)

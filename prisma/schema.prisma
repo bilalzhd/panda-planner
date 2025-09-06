@@ -62,6 +62,8 @@ model Project {
   name        String
   description String?
   color       String?
+  health      ProjectHealth @default(ON_TRACK)
+  healthAuto  Boolean       @default(true)
   team        Team     @relation(fields: [teamId], references: [id])
   teamId      String
   tasks       Task[]
@@ -246,4 +248,10 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+enum ProjectHealth {
+  ON_TRACK
+  AT_RISK
+  OFF_TRACK
 }

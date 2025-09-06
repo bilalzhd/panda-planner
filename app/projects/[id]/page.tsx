@@ -1,9 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
-import { ProjectBoard } from '@/components/project-board'
-import { CredentialsPanel } from '@/components/credentials-panel'
-import { ProjectMedia } from '@/components/project-media'
+import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
 
 export const dynamic = 'force-dynamic'
@@ -64,43 +62,22 @@ export default async function ProjectPage({ params }: { params: { id: string } }
 
   return (
     <div className="relative pt-4 px-4 rounded-lg">
-      {/* Soft background tint based on project color */}
       <div
         aria-hidden
-        className="rounded-lg pointer-events-none absolute inset-x-0 top-0 h-48 -z-10"
+        className="rounded-lg pointer-events-none absolute inset-x-0 top-0 h-40 -z-10"
         style={{
-          background: `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.20) 0%, rgba(${r}, ${g}, ${b}, 0.08) 50%, rgba(${r}, ${g}, ${b}, 0) 100%)`,
+          background: `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.18) 0%, rgba(${r}, ${g}, ${b}, 0.06) 50%, rgba(${r}, ${g}, ${b}, 0) 100%)`,
         }}
       />
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between py-1">
+          <h1 className="text-lg font-semibold flex items-center gap-2">
             <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: hex }} />
             {project.name}
           </h1>
           <DeleteProject projectId={project.id} projectName={project.name} />
         </div>
-        {overdueAll.length > 0 && (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-            <div className="mb-2 text-sm font-semibold">Overdue Tasks</div>
-            <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {overdueAll.slice(0, 9).map((t: any) => (
-                <li key={t.id} className="rounded-md border border-white/10 bg-white/5 p-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">{t.title}</div>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] ${t.priority === 'HIGH' ? 'bg-rose-500/20 text-rose-200' : t.priority === 'MEDIUM' ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>{t.priority}</span>
-                  </div>
-                  <div className="text-xs text-white/60">Due {new Date(t.dueDate).toLocaleDateString()}</div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <ProjectBoard projectId={project.id} initialTasks={project.tasks as any} />
-
-        <ProjectMedia projectId={project.id} limit={3} />
-
-        <CredentialsPanel projectId={project.id} />
+        <ProjectTabs projectId={project.id} tasks={project.tasks as any} overdue={overdueAll as any} />
       </div>
     </div>
   )

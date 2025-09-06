@@ -59,7 +59,7 @@ export function DeleteProject({ projectId, projectName }: { projectId: string; p
           <Button
             onClick={onDelete}
             disabled={loading || value !== code}
-            className="bg-red-600 text-white hover:bg-red-500"
+            className="bg-red-600 text-black hover:bg-red-500"
           >
             {loading ? 'Deleting…' : 'Confirm Delete'}
           </Button>
