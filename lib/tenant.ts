@@ -4,7 +4,14 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 export async function requireUser() {
   const { userId } = auth()
   if (!userId) throw new Error('Unauthorized')
-  const cu = await currentUser()
+  // Fetch Clerk user details best-effort; avoid hard failure during render
+  let cu: Awaited<ReturnType<typeof currentUser>> | null = null
+  try {
+    cu = await currentUser()
+  } catch (e) {
+    // Swallow to prevent opaque Server Components error; we'll upsert minimal user
+    cu = null
+  }
   // Ensure local user exists and is linked via clerkId
   const user = await prisma.user.upsert({
     where: { clerkId: userId },
@@ -39,4 +46,3 @@ export async function teamIdsForUser(userId: string) {
   const memberships = await prisma.membership.findMany({ where: { userId }, select: { teamId: true } })
   return memberships.map((m) => m.teamId)
 }
-

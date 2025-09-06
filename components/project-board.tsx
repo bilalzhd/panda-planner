@@ -400,10 +400,12 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
               <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">{initials}</span>
             )}
             <button
+              type="button"
               className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10"
               title="Delete task"
               aria-label="Delete task"
               onClick={async (e) => {
+                e.preventDefault()
                 e.stopPropagation()
                 if (deleting) return
                 const ok = window.confirm('Delete this task?')
@@ -413,6 +415,9 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
                   const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
                   if (res.ok) {
                     onDeleted?.(task.id)
+                  } else {
+                    const msg = await res.text().catch(() => '')
+                    alert(msg || 'Failed to delete task')
                   }
                 } finally {
                   setDeleting(false)

@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const task = await prisma.task.update({
     where: { id: params.id },
     data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
+    include: { project: true, assignedTo: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
   return Response.json(task)
 }

@@ -4,7 +4,7 @@ import { TaskCard } from '@/components/task-card'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
-export function KanbanBoard({ tasks }: { tasks: Task[] }) {
+export function KanbanBoard({ tasks, currentUserId }: { tasks: Task[]; currentUserId?: string }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -17,9 +17,22 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
     startTransition(() => router.refresh())
   }
 
-  const todo = tasks.filter((t) => t.status === 'TODO')
-  const inprog = tasks.filter((t) => t.status === 'IN_PROGRESS')
-  const done = tasks.filter((t) => t.status === 'DONE')
+  const sortOwnFirst = (list: Task[]) => {
+    if (!currentUserId) return list
+    // Sort: current user's tasks first, then unassigned, then others
+    return [...list].sort((a, b) => {
+      const rank = (t: Task) => (t.assignedToId === currentUserId ? 0 : t.assignedToId == null ? 1 : 2)
+      const ra = rank(a)
+      const rb = rank(b)
+      if (ra !== rb) return ra - rb
+      // Secondary: most recently updated first to surface fresh items
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    })
+  }
+
+  const todo = sortOwnFirst(tasks.filter((t) => t.status === 'TODO'))
+  const inprog = sortOwnFirst(tasks.filter((t) => t.status === 'IN_PROGRESS'))
+  const done = sortOwnFirst(tasks.filter((t) => t.status === 'DONE'))
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
@@ -58,4 +71,3 @@ function KanbanColumn({ title, status, onDrop, children }: {
     </div>
   )
 }
-

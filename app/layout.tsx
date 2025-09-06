@@ -10,7 +10,7 @@ import { Sidebar } from '@/components/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 export const metadata = {
-  title: 'Panda Planner',
+  title: 'Mera Kommunikation Task Management',
   description: 'Task & Project Management for agencies',
 }
 
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     </SheetContent>
                   </Sheet>
                 </div>
-                <Link href="/" className="font-semibold">Panda Planner</Link>
+                <Link href="/" className="font-semibold">Mera Kommunikation</Link>
               </div>
               <nav className="flex items-center gap-4 text-sm text-white/80">
                 <Link href="/dashboard">Dashboard</Link>

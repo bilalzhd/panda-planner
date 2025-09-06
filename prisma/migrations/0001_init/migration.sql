@@ -1,4 +1,4 @@
--- Initial schema for Panda Planner
+-- Initial schema for Mera Kommunikation
 -- Note: This is a handcrafted baseline for PostgreSQL matching prisma/schema.prisma
 
 CREATE TYPE "TaskStatus" AS ENUM ('TODO','IN_PROGRESS','DONE');

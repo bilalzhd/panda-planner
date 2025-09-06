@@ -17,9 +17,9 @@ export async function sendInviteEmail(to: string, acceptUrl: string) {
   const info = await transporter.sendMail({
     from,
     to,
-    subject: 'You have been invited to Panda Planner',
-    text: `You have been invited to join a team on Panda Planner. Click to accept: ${acceptUrl}`,
-    html: `<p>You have been invited to join a team on <strong>Panda Planner</strong>.</p><p><a href="${acceptUrl}">Accept invite</a></p>`,
+    subject: 'You have been invited to Mera Kommunikation Task Management',
+    text: `You have been invited to join a team on Mera Kommunikation TM. Click to accept: ${acceptUrl}`,
+    html: `<p>You have been invited to join a team on <strong>Mera Kommunikation</strong>.</p><p><a href="${acceptUrl}">Accept invite</a></p>`,
   })
   return info
 }

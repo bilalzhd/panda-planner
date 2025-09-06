@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs'
 export default function LandingPage() {
   return (
     <div className="mx-auto max-w-4xl text-center py-16">
-      <h1 className="text-3xl md:text-4xl font-bold">Panda Planner</h1>
+      <h1 className="text-3xl md:text-4xl font-bold">Mera Kommunikation Task Management</h1>
       <p className="mt-4 text-white/80">Lightweight Task & Project Management for digital marketing and web agencies.</p>
       <div className="mt-8 flex items-center justify-center gap-3">
         <SignedOut>

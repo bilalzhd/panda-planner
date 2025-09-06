@@ -61,9 +61,23 @@ export function CredentialsPanel({ projectId }: { projectId: string }) {
           <ul className="space-y-2">
             {creds.map((c) => (
               <li key={c.id} className="rounded-md border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <CredentialIcon label={c.label} />
-                  <span>{c.label}</span>
+                <div className="flex items-center justify-between gap-2 text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    <CredentialIcon label={c.label} />
+                    <span>{c.label}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs rounded border border-white/20 px-2 py-0.5 hover:bg-white/10"
+                    onClick={async () => {
+                      const ok = window.confirm('Delete this credential? This cannot be undone.')
+                      if (!ok) return
+                      const res = await fetch(`/api/credentials/${c.id}`, { method: 'DELETE' })
+                      if (res.ok) {
+                        setCreds((prev) => prev.filter((x) => x.id !== c.id))
+                      }
+                    }}
+                  >Delete</button>
                 </div>
                 <div className="text-xs text-white/60">{c.username || 'No username'}</div>
                 <div className="text-xs text-white/40 mt-1">Password hidden • Reveal from Credentials page</div>

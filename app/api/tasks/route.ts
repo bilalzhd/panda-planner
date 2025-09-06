@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
   const { dueDate, ...rest } = parsed.data
   const task = await prisma.task.create({
     data: { ...rest, dueDate: dueDate ? new Date(dueDate) : null },
+    include: { project: true, assignedTo: true },
   })
   return Response.json(task, { status: 201 })
 }
