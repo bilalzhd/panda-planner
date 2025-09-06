@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { InviteForm } from '@/components/invite-form'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TeamPage({ searchParams }: { searchParams: { teamId?: string; accepted?: string } }) {
   const { user } = await requireUser()
   const memberships = await prisma.membership.findMany({

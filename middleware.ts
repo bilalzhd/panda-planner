@@ -1,29 +1,25 @@
-import { clerkMiddleware } from '@clerk/nextjs/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 // Public routes that do not require authentication
-const publicRoutes = [
+const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/email/test',
   '/api/invites/accept',
-  '/uploads(.*)',
-]
+  '/uploads(.*)'
+])
 
 export default clerkMiddleware((auth, req) => {
-  const { pathname } = req.nextUrl
-
-  // Allow public routes
-  if (publicRoutes.some((p) => new RegExp(`^${p}$`).test(pathname))) return
-
-  const { userId } = auth()
-  if (!userId) {
-    // Redirect unauthenticated users to Sign In with return URL
-    return auth().redirectToSignIn({ returnBackUrl: req.url })
-  }
+  if (isPublicRoute(req)) return
+  auth().protect()
 })
 
 export const config = {
-  // Run on all paths except static files and _next assets
-  matcher: ['/((?!.*\\..*|_next).*)'],
+  // Recommended matcher from Clerk docs to cover pages and API
+  matcher: [
+    '/((?!.+\\.[\\w]+$|_next).*)',
+    '/',
+    '/(api|trpc)(.*)'
+  ],
 }

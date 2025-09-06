@@ -5,6 +5,8 @@ import { KanbanBoard } from '@/components/kanban-board'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { Progress } from '@/components/ui/progress'
 
+export const dynamic = 'force-dynamic'
+
 async function getData() {
   const { user } = await requireUser()
   const teamIds = await teamIdsForUser(user.id)

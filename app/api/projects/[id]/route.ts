@@ -37,6 +37,21 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const teamIds = await teamIdsForUser(user.id)
   const existing = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
-  await prisma.project.delete({ where: { id: params.id } })
+  await prisma.$transaction(async (tx) => {
+    const tasks = await tx.task.findMany({ where: { projectId: params.id }, select: { id: true } })
+    const taskIds = tasks.map((t) => t.id)
+    if (taskIds.length > 0) {
+      // Remove dependent records with restrictive FKs first
+      await tx.timesheet.deleteMany({ where: { taskId: { in: taskIds } } })
+      // Schedules, comments, and attachments are CASCADE in migrations, but call defensively
+      await tx.taskSchedule.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => {})
+      await tx.comment.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => {})
+      await tx.attachment.deleteMany({ where: { taskId: { in: taskIds } } }).catch(() => {})
+      await tx.task.deleteMany({ where: { id: { in: taskIds } } })
+    }
+    // Project-scoped credentials, if present
+    await tx.credential.deleteMany({ where: { projectId: params.id } }).catch(() => {})
+    await tx.project.delete({ where: { id: params.id } })
+  })
   return new Response(null, { status: 204 })
 }

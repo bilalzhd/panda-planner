@@ -4,6 +4,8 @@ import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 
+export const dynamic = 'force-dynamic'
+
 async function getTasks(status?: string) {
   const { user } = await requireUser()
   const teamIds = await teamIdsForUser(user.id)
@@ -39,4 +41,3 @@ export default async function TasksPage({ searchParams }: { searchParams: { stat
     </div>
   )
 }
-

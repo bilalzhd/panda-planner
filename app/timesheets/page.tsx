@@ -7,6 +7,8 @@ import { expandSchedules } from '@/lib/schedule'
 import { ScheduleDialog } from '@/components/schedule-dialog'
 import { TimesheetToolbar } from '@/components/timesheet-toolbar'
 
+export const dynamic = 'force-dynamic'
+
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x }
 function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate()+n); return x }
 

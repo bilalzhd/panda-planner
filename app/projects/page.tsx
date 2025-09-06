@@ -4,6 +4,8 @@ import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
+export const dynamic = 'force-dynamic'
+
 async function getProjects() {
   const { user } = await requireUser()
   const teamIds = await teamIdsForUser(user.id)
@@ -41,4 +43,3 @@ export default async function ProjectsPage() {
     </div>
   )
 }
-

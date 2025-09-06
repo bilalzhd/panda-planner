@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { revalidatePath } from 'next/cache'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 
+export const dynamic = 'force-dynamic'
+
 async function getTask(id: string) {
   const { user } = await requireUser()
   const teamIds = await teamIdsForUser(user.id)

@@ -142,6 +142,23 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
     }
   }
 
+  async function deleteSelected() {
+    if (!selected) return
+    const ok = window.confirm('Delete this task? This cannot be undone.')
+    if (!ok) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/tasks/${selected.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTasks((prev) => prev.filter((t) => t.id !== selected.id))
+        setEditOpen(false)
+        startTransition(() => router.refresh())
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {(Object.keys(columns) as TaskStatus[]).map((status) => (
@@ -157,7 +174,14 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
           onQuickAdd={quickAdd}
         >
           {columns[status].map((t) => (
-            <TaskRow key={t.id} task={t} />
+            <TaskRow
+              key={t.id}
+              task={t}
+              onDeleted={(id) => {
+                setTasks((prev) => prev.filter((x) => x.id !== id))
+                startTransition(() => router.refresh())
+              }}
+            />
           ))}
         </Column>
       ))}
@@ -238,6 +262,14 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
           </div>
         )}
         <DialogFooter>
+          <Button
+            variant="outline"
+            className="border-red-500/40 text-red-400 hover:text-red-300"
+            onClick={deleteSelected}
+            disabled={saving}
+          >
+            {saving ? 'Deleting...' : 'Delete'}
+          </Button>
           <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
           <Button onClick={saveEdit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </DialogFooter>
@@ -323,9 +355,10 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
   )
 }
 
-function TaskRow({ task }: { task: TaskExtras }) {
+function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: string) => void }) {
   const totalHours = (task.timesheets || []).reduce((acc, t) => acc + Number(t.hours || 0), 0)
   const [drag, setDrag] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const initials = useMemo(() => {
     const n = task.assignedTo?.name || task.assignedTo?.email || ''
     const parts = n.split(' ')
@@ -366,6 +399,28 @@ function TaskRow({ task }: { task: TaskExtras }) {
             ) : (
               <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">{initials}</span>
             )}
+            <button
+              className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10"
+              title="Delete task"
+              aria-label="Delete task"
+              onClick={async (e) => {
+                e.stopPropagation()
+                if (deleting) return
+                const ok = window.confirm('Delete this task?')
+                if (!ok) return
+                try {
+                  setDeleting(true)
+                  const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
+                  if (res.ok) {
+                    onDeleted?.(task.id)
+                  }
+                } finally {
+                  setDeleting(false)
+                }
+              }}
+            >
+              {trashIcon}
+            </button>
           </div>
         </div>
       </div>
@@ -383,6 +438,15 @@ const gearIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M19.4 15a7.97 7.97 0 0 0 .2-1 7.97 7.97 0 0 0-.2-1l2.1-1.6-2-3.4-2.5.8a8.2 8.2 0 0 0-1.8-1l-.4-2.6H11l-.4 2.6a8.2 8.2 0 0 0-1.8 1l-2.5-.8-2 3.4L3.4 13a7.97 7.97 0 0 0 0 2l-2.1 1.6 2 3.4 2.5-.8c.6.4 1.2.8 1.8 1l.4 2.6H13l.4-2.6c.6-.2 1.2-.6 1.8-1l2.5.8 2-3.4L19.4 15Z" stroke="currentColor" strokeWidth="1.5"/>
+  </svg>
+)
+
+const trashIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 6h18" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="1.5"/>
   </svg>
 )
 

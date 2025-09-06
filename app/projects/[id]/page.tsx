@@ -7,6 +7,9 @@ import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { ProjectBoard } from '@/components/project-board'
 import { CredentialsPanel } from '@/components/credentials-panel'
+import { DeleteProject } from '@/components/delete-project'
+
+export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
@@ -28,6 +31,7 @@ export default async function ProjectPage({ params }: { params: { id: string } }
           <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: (project.color ? project.color : '#9ca3af') }} />
           {project.name}
         </h1>
+        <DeleteProject projectId={project.id} projectName={project.name} />
       </div>
 
       <ProjectBoard projectId={project.id} initialTasks={project.tasks as any} />
