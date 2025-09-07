@@ -138,7 +138,7 @@ export default async function DashboardPage() {
           </Card>
           <Card>
             <CardHeader className="font-semibold">Project Progress</CardHeader>
-            <CardContent>
+            <CardContent className="min-h-40">
               {projects.length === 0 && <div className="text-sm text-white/60">No projects</div>}
               {projects.slice(0, 3).map((p) => {
                 const tasks = allTasks.filter((t) => t.projectId === p.id)

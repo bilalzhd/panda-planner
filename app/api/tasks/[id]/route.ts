@@ -38,6 +38,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   const teamIds = await teamIdsForUser(user.id)
   const existing = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
+  // Delete dependent records first to avoid FK constraint errors
+  await prisma.comment.deleteMany({ where: { taskId: params.id } })
+  await prisma.attachment.deleteMany({ where: { taskId: params.id } })
+  await prisma.timesheet.deleteMany({ where: { taskId: params.id } })
+  await prisma.taskSchedule.deleteMany({ where: { taskId: params.id } })
   await prisma.task.delete({ where: { id: params.id } })
   return new Response(null, { status: 204 })
 }

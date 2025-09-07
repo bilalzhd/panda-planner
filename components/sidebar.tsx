@@ -11,6 +11,7 @@ type Project = { id: string; name: string; color?: string | null }
 
 export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([])
+  const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -64,9 +65,22 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
           <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
         </nav>
         <div className="mt-4 text-xs uppercase tracking-wide text-white/50 px-1">Projects</div>
+        <div className="px-1">
+          <Input
+            placeholder="Search projects..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const query = q.trim()
+                if (query) router.push(`/projects?q=${encodeURIComponent(query)}`)
+              }
+            }}
+          />
+        </div>
         <div className="flex-1 overflow-auto">
           <ul className="space-y-1">
-            {projects.map((p) => {
+            {(q.trim() ? projects.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())) : projects).map((p) => {
               const active = pathname?.startsWith(`/projects/${p.id}`)
               return (
                 <li key={p.id}>

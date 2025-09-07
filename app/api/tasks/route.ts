@@ -32,8 +32,10 @@ export async function POST(req: NextRequest) {
   const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, teamId: { in: teamIds } } })
   if (!project) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const { dueDate, ...rest } = parsed.data
+  // If no assignee provided (e.g., quick add), assign to the creator by default
+  const assignedToId = rest.assignedToId ?? user.id
   const task = await prisma.task.create({
-    data: { ...rest, dueDate: dueDate ? new Date(dueDate) : null },
+    data: { ...rest, assignedToId, dueDate: dueDate ? new Date(dueDate) : null },
     include: { project: true, assignedTo: true },
   })
   return Response.json(task, { status: 201 })
