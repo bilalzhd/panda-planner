@@ -4,7 +4,10 @@ import { TaskCard } from '@/components/task-card'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
-export function KanbanBoard({ tasks, currentUserId }: { tasks: Task[]; currentUserId?: string }) {
+export function KanbanBoard(
+  { tasks, currentUserId, limitPerColumn, showViewAllLinks }:
+  { tasks: Task[]; currentUserId?: string; limitPerColumn?: number; showViewAllLinks?: boolean }
+) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -30,30 +33,37 @@ export function KanbanBoard({ tasks, currentUserId }: { tasks: Task[]; currentUs
     })
   }
 
-  const todo = sortOwnFirst(tasks.filter((t) => t.status === 'TODO'))
-  const inprog = sortOwnFirst(tasks.filter((t) => t.status === 'IN_PROGRESS'))
-  const done = sortOwnFirst(tasks.filter((t) => t.status === 'DONE'))
+  const todoFull = sortOwnFirst(tasks.filter((t) => t.status === 'TODO'))
+  const inprogFull = sortOwnFirst(tasks.filter((t) => t.status === 'IN_PROGRESS'))
+  const doneFull = sortOwnFirst(tasks.filter((t) => t.status === 'DONE'))
+
+  const todo = typeof limitPerColumn === 'number' ? todoFull.slice(0, limitPerColumn) : todoFull
+  const inprog = typeof limitPerColumn === 'number' ? inprogFull.slice(0, limitPerColumn) : inprogFull
+  const done = typeof limitPerColumn === 'number' ? doneFull.slice(0, limitPerColumn) : doneFull
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
-      <KanbanColumn title="To Do" status="TODO" onDrop={(id) => moveTask(id, 'TODO')}>
+      <KanbanColumn title="To Do" status="TODO" onDrop={(id) => moveTask(id, 'TODO')} viewAllHref={showViewAllLinks ? '/tasks?status=TODO' : undefined}>
         {todo.map((t) => (<TaskCard key={t.id} task={t as any} />))}
       </KanbanColumn>
-      <KanbanColumn title="In Progress" status="IN_PROGRESS" onDrop={(id) => moveTask(id, 'IN_PROGRESS')}>
+      <KanbanColumn title="In Progress" status="IN_PROGRESS" onDrop={(id) => moveTask(id, 'IN_PROGRESS')} viewAllHref={showViewAllLinks ? '/tasks?status=IN_PROGRESS' : undefined}>
         {inprog.map((t) => (<TaskCard key={t.id} task={t as any} />))}
       </KanbanColumn>
-      <KanbanColumn title="Done" status="DONE" onDrop={(id) => moveTask(id, 'DONE')}>
+      <KanbanColumn title="Done" status="DONE" onDrop={(id) => moveTask(id, 'DONE')} viewAllHref={showViewAllLinks ? '/tasks?status=DONE' : undefined}>
         {done.map((t) => (<TaskCard key={t.id} task={t as any} />))}
       </KanbanColumn>
     </div>
   )
 }
 
-function KanbanColumn({ title, status, onDrop, children }: {
+import Link from 'next/link'
+
+function KanbanColumn({ title, status, onDrop, children, viewAllHref }: {
   title: string
   status: TaskStatus
   onDrop: (taskId: string) => void
   children: React.ReactNode
+  viewAllHref?: string
 }) {
   return (
     <div
@@ -65,9 +75,12 @@ function KanbanColumn({ title, status, onDrop, children }: {
       }}
     >
       <div className="mb-2 text-sm font-semibold">{title}</div>
-      <div className="space-y-2">
-        {children}
-      </div>
+      <div className="space-y-2">{children}</div>
+      {viewAllHref && (
+        <div className="mt-3">
+          <Link href={viewAllHref} className="text-xs text-white/70 hover:text-white underline">View full list</Link>
+        </div>
+      )}
     </div>
   )
 }

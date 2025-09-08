@@ -62,9 +62,9 @@ function StatusBadge({ value }: { value: TaskStatus }) {
 
 function PriorityBadge({ value }: { value: TaskPriority }) {
   const map: Record<TaskPriority, string> = {
-    LOW: 'bg-white/10',
-    MEDIUM: 'bg-blue-500/20 text-blue-200',
-    HIGH: 'bg-rose-500/20 text-rose-200',
+    HIGH: 'priority-high bg-rose-500/20 text-rose-200 border border-rose-500/30',
+    MEDIUM: 'priority-medium bg-amber-500/20 text-amber-200 border border-amber-500/30',
+    LOW: 'priority-low bg-emerald-500/20 text-emerald-200 border border-emerald-500/30',
   }
   return <span className={`px-1.5 py-0.5 rounded ${map[value]}`}>{value}</span>
 }
@@ -80,4 +80,3 @@ function formatHours(h: number) {
   const minutes = Math.round((h - hours) * 60)
   return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}`
 }
-

@@ -165,7 +165,7 @@ export default async function DashboardPage() {
 
       <div>
         <div className="mb-2 text-sm font-semibold">Global To-Do</div>
-        <KanbanBoard tasks={allTasks as any} currentUserId={user.id} />
+        <KanbanBoard tasks={allTasks as any} currentUserId={user.id} limitPerColumn={5} showViewAllLinks />
       </div>
 
       {/* Invite form moved to Team page */}

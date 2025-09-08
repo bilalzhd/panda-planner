@@ -48,6 +48,23 @@ body {
 .theme-light .hover\:text-white:hover { color: #111827 !important; }
 .theme-light .ring-white { --tw-ring-color: rgba(0,0,0,0.75) !important; }
 
+/* Priority pill visibility in light theme */
+.theme-light .priority-high {
+  background-color: rgba(244, 63, 94, 0.18) !important; /* rose-500 */
+  color: #7f1d1d !important; /* rose-900 */
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+.theme-light .priority-medium {
+  background-color: rgba(245, 158, 11, 0.20) !important; /* amber-500 */
+  color: #78350f !important; /* amber-900 */
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+.theme-light .priority-low {
+  background-color: rgba(16, 185, 129, 0.20) !important; /* emerald-500 */
+  color: #064e3b !important; /* emerald-900 */
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
 /* Form field readability in light theme */
 .theme-light input,
 .theme-light textarea,
