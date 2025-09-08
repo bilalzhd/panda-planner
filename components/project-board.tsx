@@ -290,6 +290,7 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
   children: React.ReactNode
 }) {
   const [hover, setHover] = useState(false)
+  const [dragDepth, setDragDepth] = useState(0)
   const [quick, setQuick] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -340,13 +341,28 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
         />
       </div>
       <div
-        className={`p-3 space-y-2 min-h-[200px] transition-colors ${hover ? 'ring-2 ring-white/20 rounded-lg' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setHover(true) }}
-        onDragLeave={() => setHover(false)}
+        className={`p-3 space-y-2 min-h-[200px] transition-colors rounded-md border-2 border-dashed ${hover ? 'border-white/40 bg-white/[0.03]' : 'border-transparent'}`}
+        onDragEnter={(e) => {
+          e.preventDefault()
+          setDragDepth((d) => d + 1)
+          setHover(true)
+        }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          if (!hover) setHover(true)
+        }}
+        onDragLeave={() => {
+          setDragDepth((d) => {
+            const n = d - 1
+            if (n <= 0) setHover(false)
+            return Math.max(0, n)
+          })
+        }}
         onDrop={(e) => {
           const id = e.dataTransfer.getData('text/task-id')
           if (id) onDropTask(id)
           setHover(false)
+          setDragDepth(0)
         }}
       >
         {children}

@@ -30,6 +30,7 @@ async function getData() {
 
 export default async function DashboardPage() {
   const { projects, tasksToday, allTasks, timesheets, user } = await getData()
+  const projectById = Object.fromEntries(projects.map((p) => [p.id, p]))
   const startOfToday = new Date(new Date().toDateString())
   const startOfTomorrow = new Date(new Date(startOfToday).setDate(startOfToday.getDate() + 1))
   // Your upcoming = your non-done tasks with dueDate today or later
@@ -84,11 +85,13 @@ export default async function DashboardPage() {
               <div className="flex h-40 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/60">No upcoming tasks</div>
             )}
             {yourUpcoming.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {yourUpcoming
                   .slice()
                   .slice(0, 9)
-                  .map((t) => (<TaskCard key={t.id} task={t as any} />))}
+                  .map((t) => (
+                    <TaskCard key={t.id} task={t as any} projectName={projectById[(t as any).projectId]?.name} />
+                  ))}
               </div>
             )}
           </CardContent>

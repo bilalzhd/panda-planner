@@ -3,7 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 
-type MediaItem = { name: string; path: string; size: number | null; updatedAt?: string | null; url: string }
+type MediaItem = {
+  name: string
+  path: string
+  size: number | null
+  updatedAt?: string | null
+  url: string
+  label?: string | null
+  description?: string | null
+}
 
 export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: number }) {
   const [items, setItems] = useState<MediaItem[]>([])
@@ -11,6 +19,8 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
   const [open, setOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
+  const [label, setLabel] = useState('')
+  const [description, setDescription] = useState('')
 
   async function load() {
     setLoading(true)
@@ -25,12 +35,16 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
     if (!file) return
     const fd = new FormData()
     fd.set('file', file)
+    if (label.trim()) fd.set('label', label.trim())
+    if (description.trim()) fd.set('description', description.trim())
     setUploading(true)
     const res = await fetch(`/api/projects/${projectId}/media`, { method: 'POST', body: fd })
     setUploading(false)
     if (res.ok) {
       setOpen(false)
       fileRef.current && (fileRef.current.value = '')
+      setLabel('')
+      setDescription('')
       load()
     }
   }
@@ -65,15 +79,28 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
                 <Preview url={m.url} name={m.name} />
                 <div className="p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <a href={m.url} target="_blank" rel="noreferrer" className="font-medium hover:underline truncate" title={m.name}>{m.name}</a>
+                    <a
+                      href={m.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium hover:underline truncate"
+                      title={m.label || m.name}
+                    >
+                      {m.label || m.name}
+                    </a>
                     <button
                       type="button"
                       className="text-xs rounded border border-white/20 px-2 py-0.5 hover:bg-white/10"
                       onClick={() => remove(m.path)}
                     >Delete</button>
                   </div>
-                  <div className="text-xs text-white/60">
-                    {(m.size ? formatSize(m.size) : '')} {m.updatedAt ? `• ${new Date(m.updatedAt).toLocaleDateString()}` : ''}
+                  {m.description && <div className="text-xs text-white/80 mt-1 line-clamp-2">{m.description}</div>}
+                  <div className="text-[11px] text-white/50 mt-1">
+                    <span className="truncate" title={m.name}>{m.name}</span>
+                    <span>
+                      {(m.size ? ` • ${formatSize(m.size)}` : '')}
+                      {m.updatedAt ? ` • ${new Date(m.updatedAt).toLocaleDateString()}` : ''}
+                    </span>
                   </div>
                 </div>
               </li>
@@ -86,7 +113,29 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
         <DialogHeader>Upload Media</DialogHeader>
         <div className="p-3">
           <input ref={fileRef} type="file" className="block w-full text-sm" />
-          <div className="text-xs text-white/60 mt-1">Any file type (images, PDFs, docs, etc.)</div>
+          <div className="grid grid-cols-1 gap-2 mt-3">
+            <label className="text-xs text-white/80">
+              Name (optional)
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g., Roof blueprint, Signed contract"
+                className="mt-1 block w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </label>
+            <label className="text-xs text-white/80">
+              Description (optional)
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Short note about this file..."
+                rows={3}
+                className="mt-1 block w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </label>
+          </div>
+          <div className="text-xs text-white/60 mt-2">Any file type (images, PDFs, docs, etc.)</div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>

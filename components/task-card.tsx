@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Task, TaskPriority } from '@prisma/client'
 
-export function TaskCard({ task }: { task: Task & { projectId: string } }) {
+export function TaskCard({ task, projectName }: { task: Task & { projectId: string }, projectName?: string }) {
   const priorityColor: Record<TaskPriority, string> = {
     LOW: 'text-emerald-300',
     MEDIUM: 'text-yellow-300',
@@ -14,11 +14,14 @@ export function TaskCard({ task }: { task: Task & { projectId: string } }) {
       e.dataTransfer.setData('text/task-id', task.id)
       e.dataTransfer.effectAllowed = 'move'
     }}>
-      <div className="rounded-md border border-white/10 bg-white/5 p-3 hover:bg-white/10">
+      <div className="h-full rounded-md border border-white/10 bg-white/5 p-3 hover:bg-white/10">
         <div className="flex items-center justify-between">
           <div className="font-medium">{task.title}</div>
           <Badge className={priorityColor[task.priority]}>{task.priority}</Badge>
         </div>
+        {projectName && (
+          <div className="mt-1 text-xs text-white/50">{projectName}</div>
+        )}
         {task.dueDate && (
           <div className="mt-2 text-xs text-white/60">Due {new Date(task.dueDate).toLocaleDateString()}</div>
         )}
