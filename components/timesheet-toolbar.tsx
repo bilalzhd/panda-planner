@@ -25,8 +25,9 @@ export function TimesheetToolbar({ from, to, range }: { from: string; to: string
       const t = new Date(today.getFullYear(), today.getMonth()+1, 0)
       push(f, t)
     } else {
-      const f = addDays(today, -6)
-      push(f, today)
+      const f = today
+      const t = addDays(today, 6)
+      push(f, t)
     }
   }
 
@@ -72,8 +73,9 @@ export function TimesheetToolbar({ from, to, range }: { from: string; to: string
             const t = new Date(fromDate.getFullYear(), fromDate.getMonth()+1, 0)
             push(f, t, 'month')
           } else {
-            const t = new Date(); t.setHours(0,0,0,0)
-            const f = addDays(t, -6)
+            const today = new Date(); today.setHours(0,0,0,0)
+            const f = today
+            const t = addDays(today, 6)
             push(f, t, 'week')
           }
         }}

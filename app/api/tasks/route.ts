@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       assignedToId,
       status: status as any,
     },
-    include: { project: true, assignedTo: true },
+    include: { project: true, assignedTo: true, createdBy: true },
     orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
   })
   return Response.json(tasks)
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
   // If no assignee provided (e.g., quick add), assign to the creator by default
   const assignedToId = rest.assignedToId ?? user.id
   const task = await prisma.task.create({
-    data: { ...rest, assignedToId, dueDate: dueDate ? new Date(dueDate) : null },
-    include: { project: true, assignedTo: true },
+    data: { ...rest, assignedToId, createdById: user.id, dueDate: dueDate ? new Date(dueDate) : null },
+    include: { project: true, assignedTo: true, createdBy: true },
   })
   return Response.json(task, { status: 201 })
 }

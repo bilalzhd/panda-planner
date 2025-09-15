@@ -18,8 +18,9 @@ export default async function TimesheetsPage({ searchParams }: { searchParams: {
 
   const today = startOfDay(new Date())
   const range = searchParams.range || 'week'
-  const defaultFrom = range === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : startOfDay(addDays(today, -6))
-  const defaultTo = range === 'month' ? new Date(today.getFullYear(), today.getMonth()+1, 0) : today
+  // Default: show today as the first column for week view
+  const defaultFrom = range === 'month' ? new Date(today.getFullYear(), today.getMonth(), 1) : today
+  const defaultTo = range === 'month' ? new Date(today.getFullYear(), today.getMonth()+1, 0) : addDays(today, 6)
   const from = searchParams.from ? startOfDay(new Date(searchParams.from)) : defaultFrom
   const to = searchParams.to ? startOfDay(new Date(searchParams.to)) : defaultTo
 

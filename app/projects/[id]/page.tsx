@@ -11,7 +11,7 @@ async function getProject(id: string) {
   const teamIds = await teamIdsForUser(user.id)
   const project = await prisma.project.findFirst({
     where: { id, teamId: { in: teamIds } },
-    include: { tasks: { orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], include: { assignedTo: true, timesheets: true } } },
+    include: { tasks: { orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], include: { assignedTo: true, createdBy: true, timesheets: true } } },
   })
   if (!project) notFound()
   return project

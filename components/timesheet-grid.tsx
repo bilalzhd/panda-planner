@@ -89,7 +89,7 @@ export function TimesheetGrid({
         <tbody>
           {localRows.map((r, i) => (
             <tr key={r.id} className="border-t border-white/10">
-              <td className="sticky left-0 z-10 bg-[#0b0d12] px-2 py-2 w-[320px]">
+              <td className="sticky left-0 z-10 bg-white/5 px-2 py-2 w-[320px]">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white/10 text-[10px]">{String.fromCharCode(65 + (i % 26))}</span>
                   <div>
@@ -117,7 +117,7 @@ export function TimesheetGrid({
           ))}
           {taskOptions && (
             <tr className="border-t border-white/10">
-              <td className="sticky left-0 z-10 bg-[#0b0d12] px-2 py-2" colSpan={days.length + 2}>
+              <td className="sticky left-0 z-10 bg-white/5 px-2 py-2" colSpan={days.length + 2}>
                 {!adding ? (
                   <button type="button" className="text-sm text-white/80 hover:underline" onClick={() => setAdding(true)}>+ Add a line</button>
                 ) : (

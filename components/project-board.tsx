@@ -8,8 +8,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { useRouter } from 'next/navigation'
 
+type UserMini = { id: string; name: string | null; email: string | null; image: string | null }
 type TaskExtras = Task & {
-  assignedTo?: { id: string; name: string | null; email: string | null; image: string | null } | null
+  assignedTo?: UserMini | null
+  createdBy?: UserMini | null
   timesheets?: { hours: any }[]
 }
 
@@ -410,6 +412,11 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
             <span className="rounded bg-white/10 px-1.5 py-0.5">{formatHours(totalHours)}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* task.createdBy && (
+              <span className="text-[10px] text-white/50" title={`Added by ${task.createdBy.name || task.createdBy.email}`}>
+                by {task.createdBy.name || task.createdBy.email}
+              </span>
+            )*/}
             {task.assignedTo?.image ? (
               <img src={task.assignedTo.image} alt={task.assignedTo.name || 'User'} className="h-5 w-5 rounded-full object-cover" />
             ) : (

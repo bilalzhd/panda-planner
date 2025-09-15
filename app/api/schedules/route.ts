@@ -31,13 +31,18 @@ export async function POST(req: NextRequest) {
   const startDate = body?.startDate ? new Date(body.startDate) : null
   const endDate = body?.endDate ? new Date(body.endDate) : null
 
-  // Authorization: ensure the task belongs to one of the user's teams
-  const task = await prisma.task.findFirst({ where: { id: taskId, project: { teamId: { in: await teamIdsForUser(user.id) } } } })
+  // Authorization: ensure the task belongs to one of the requester's teams
+  const task = await prisma.task.findFirst({ where: { id: taskId, project: { teamId: { in: await teamIdsForUser(user.id) } } }, include: { project: true } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
+  // Allow specifying a target user to schedule for (e.g., Bilal),
+  // but only if that user is a member of the task's team.
+  const targetUserId: string = body?.userId || user.id
+  const targetMember = await prisma.membership.findFirst({ where: { teamId: task.project.teamId, userId: targetUserId } })
+  if (!targetMember) return Response.json({ error: 'User not in project team' }, { status: 403 })
+
   const rule = await prisma.taskSchedule.create({
-    data: { taskId, userId: user.id, isRecurring, frequency, byWeekday, timeOfDay, durationMin, date, startDate, endDate },
+    data: { taskId, userId: targetUserId, isRecurring, frequency, byWeekday, timeOfDay, durationMin, date, startDate, endDate },
   })
   return Response.json(rule, { status: 201 })
 }
-

@@ -35,7 +35,9 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   } catch {}
   const useSigned = ['1','true','TRUE','yes','YES'].includes(String(process.env.SUPABASE_MEDIA_SIGNED || 'false'))
   const ttl = Number(process.env.SUPABASE_SIGNED_URL_TTL || 3600)
-  const items = await Promise.all((data || []).map(async (f) => {
+  // Exclude the internal metadata file from listings
+  const files = (data || []).filter((f) => f.name !== '_meta.json')
+  const items = await Promise.all(files.map(async (f) => {
     const path = prefix + f.name
     let url = getPublicUrl(path)
     if (useSigned) {
@@ -88,8 +90,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       description: description || undefined,
       updatedAt: new Date().toISOString(),
     }
-    const blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' })
-    await supabase.storage.from(MEDIA_BUCKET).upload(metaPath, blob, { contentType: 'application/json', upsert: true })
+    const metaBuf = Buffer.from(JSON.stringify(meta, null, 2), 'utf8')
+    await supabase.storage.from(MEDIA_BUCKET).upload(metaPath, metaBuf, { contentType: 'application/json', upsert: true })
   } catch {}
   // Return appropriate URL based on visibility (signed vs public)
   const useSigned = ['1','true','TRUE','yes','YES'].includes(String(process.env.SUPABASE_MEDIA_SIGNED || 'false'))
@@ -123,8 +125,8 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
       const filename = path.split('/').pop() as string
       if (meta[filename]) {
         delete meta[filename]
-        const blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' })
-        await supabase.storage.from(MEDIA_BUCKET).upload(metaPath, blob, { contentType: 'application/json', upsert: true })
+        const metaBuf = Buffer.from(JSON.stringify(meta, null, 2), 'utf8')
+        await supabase.storage.from(MEDIA_BUCKET).upload(metaPath, metaBuf, { contentType: 'application/json', upsert: true })
       }
     }
   } catch {}

@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const teamIds = await teamIdsForUser(user.id)
   const task = await prisma.task.findFirst({
     where: { id: params.id, project: { teamId: { in: teamIds } } },
-    include: { project: true, assignedTo: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
+    include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
   return Response.json(task)
@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const task = await prisma.task.update({
     where: { id: params.id },
     data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
-    include: { project: true, assignedTo: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
+    include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
   return Response.json(task)
 }

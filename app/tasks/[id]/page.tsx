@@ -14,7 +14,7 @@ async function getTask(id: string) {
   const teamIds = await teamIdsForUser(user.id)
   const task = await prisma.task.findFirst({
     where: { id, project: { teamId: { in: teamIds } } },
-    include: { project: true, assignedTo: true, comments: { include: { author: true }, orderBy: { createdAt: 'asc' } }, attachments: true, timesheets: { include: { user: true }, orderBy: { date: 'desc' } } },
+    include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true }, orderBy: { createdAt: 'asc' } }, attachments: true, timesheets: { include: { user: true }, orderBy: { date: 'desc' } } },
   })
   if (!task) notFound()
   return task
@@ -75,6 +75,9 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
         <CardHeader className="font-semibold">{task.title}</CardHeader>
         <CardContent>
           {task.description && <p className="text-white/80 mb-2">{task.description}</p>}
+          {task.createdBy && (
+            <div className="text-xs text-white/60 mb-1">Added by {task.createdBy.name || task.createdBy.email}</div>
+          )}
           {task.dueDate && <div className="text-sm text-white/60">Due {new Date(task.dueDate).toLocaleDateString()}</div>}
         </CardContent>
       </Card>

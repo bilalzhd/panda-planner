@@ -42,9 +42,15 @@ model User {
   credentialsPinHash String?
 
   tasksAssigned Task[]      @relation("TasksAssigned")
+  tasksCreated Task[]      @relation("TasksCreated")
   timesheets    Timesheet[]
   comments      Comment[]
   attachments   Attachment[] @relation("AttachmentsUploaded")
+  teamMessages  TeamMessage[]
+  teamMessageReads TeamMessageRead[]
+  channelsCreated TeamChannel[]
+  channelMemberships ChannelMember[]
+  channelMessages ChannelMessage[]
 
   teamsOwned    Team[]      @relation("TeamOwner")
   memberships   Membership[]
@@ -87,6 +93,9 @@ model Task {
   id          String         @id @default(cuid())
   project     Project        @relation(fields: [projectId], references: [id])
   projectId   String
+  // User who created the task
+  createdBy   User?          @relation("TasksCreated", fields: [createdById], references: [id])
+  createdById String?
   parent      Task?          @relation("Subtasks", fields: [parentId], references: [id])
   parentId    String?
   children    Task[]         @relation("Subtasks")
@@ -185,6 +194,8 @@ model Team {
   projects  Project[]
   members   Membership[]
   invites   TeamInvite[]
+  messages  TeamMessage[]
+  channels  TeamChannel[]
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 }
@@ -211,6 +222,64 @@ model TeamInvite {
   invitedById String
   expiresAt   DateTime
   createdAt   DateTime      @default(now())
+}
+
+// Lightweight team-wide message for async chat/requests
+model TeamMessage {
+  id        String   @id @default(cuid())
+  team      Team     @relation(fields: [teamId], references: [id])
+  teamId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reads     TeamMessageRead[]
+}
+
+model TeamMessageRead {
+  id         String       @id @default(cuid())
+  message    TeamMessage  @relation(fields: [messageId], references: [id])
+  messageId  String
+  user       User         @relation(fields: [userId], references: [id])
+  userId     String
+  readAt     DateTime     @default(now())
+  @@unique([messageId, userId])
+}
+
+// Channel-based messaging (Slack-like)
+model TeamChannel {
+  id        String        @id @default(cuid())
+  team      Team          @relation(fields: [teamId], references: [id])
+  teamId    String
+  name      String
+  createdBy User          @relation(fields: [createdById], references: [id])
+  createdById String
+  members   ChannelMember[]
+  messages  ChannelMessage[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChannelMember {
+  id        String      @id @default(cuid())
+  channel   TeamChannel @relation(fields: [channelId], references: [id])
+  channelId String
+  user      User        @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime    @default(now())
+  @@unique([channelId, userId])
+}
+
+model ChannelMessage {
+  id        String      @id @default(cuid())
+  channel   TeamChannel @relation(fields: [channelId], references: [id])
+  channelId String
+  author    User        @relation(fields: [authorId], references: [id])
+  authorId  String
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 }
 
 // NextAuth required models

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Sidebar } from '@/components/sidebar'
 // Removed header credentials reveal in favor of sidebar and dedicated pages
 import { ThemeToggle } from '@/components/theme-toggle'
+import { MobileFooterNav } from '@/components/mobile-footer-nav'
 
 export const metadata = {
   title: 'Mera Kommunikation Task Management',
@@ -39,8 +40,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
                 <Link href="/" className="font-semibold">Mera Kommunikation</Link>
               </div>
-              <nav className="flex items-center gap-4 text-sm text-white/80">
+              <nav className="hidden md:flex items-center gap-4 text-sm text-white/80">
                 <Link href="/dashboard">Dashboard</Link>
+                <Link href="/tasks/mine">Your Tasks</Link>
+                <Link href="/todos">Todos</Link>
+                <Link href="/messages">Messages</Link>
                 <Link href="/timesheets">Timesheets</Link>
                 <SignedIn>
                   <ThemeToggle />
@@ -58,8 +62,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </header>
           <main>
             <AppShell>
-              <div className="container py-6">{children}</div>
+              <div className="container py-6 pb-20 md:pb-6">{children}</div>
             </AppShell>
+            <MobileFooterNav />
           </main>
         </body>
       </html>

@@ -17,6 +17,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [description, setDescription] = useState('')
   const [color, setColor] = useState<string>('blue')
   const [loading, setLoading] = useState(false)
+  const [navExpanded, setNavExpanded] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -53,8 +54,8 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   }
 
   const content = (
-      <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-4 p-4 w-full`}>
-        <div className="text-lg font-semibold px-1">TaskFlow</div>
+      <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-3 p-4 w-full`}>
+        <div className={`${navExpanded ? 'max-h-none' : 'max-h-48'} overflow-auto pr-1 -mr-1`}>
         <nav className="flex flex-col gap-1">
           <SideLink href="/dashboard" active={isActive('/dashboard')} icon={iconDashboard}>Dashboard</SideLink>
           <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
@@ -64,6 +65,14 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
           <SideLink href="/settings/pin" active={isActive('/settings/pin')} icon={iconLock}>PIN Settings</SideLink>
           <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
         </nav>
+        </div>
+        <button
+          type="button"
+          className="self-start -mt-1 text-xs text-white/60 hover:text-white/80 px-1"
+          onClick={() => setNavExpanded((v) => !v)}
+        >
+          {navExpanded ? 'Show fewer menu items' : 'Show all menu items'}
+        </button>
         <div className="mt-4 text-xs uppercase tracking-wide text-white/50 px-1">Projects</div>
         <div className="px-1">
           <Input
@@ -78,7 +87,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
             }}
           />
         </div>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 min-h-32 overflow-auto">
           <ul className="space-y-1">
             {(q.trim() ? projects.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())) : projects).map((p) => {
               const active = pathname?.startsWith(`/projects/${p.id}`)
