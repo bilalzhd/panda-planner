@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { sendTaskAssignedEmail } from '@/lib/email'
 
 type Params = { params: { id: string } }
 
@@ -30,6 +31,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
     include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
+  // If assignment changed to a new user, notify them (but not on self-assign)
+  if (typeof rest.assignedToId !== 'undefined' && rest.assignedToId && rest.assignedToId !== existing.assignedToId) {
+    if (task.assignedTo?.email && rest.assignedToId !== user.id) {
+      try {
+        await sendTaskAssignedEmail({ to: task.assignedTo.email, task })
+      } catch (e) {
+        console.error('Failed to send assignment email:', e)
+      }
+    }
+  }
   return Response.json(task)
 }
 

@@ -4,6 +4,17 @@ Task and project management with timesheets, messaging, and media support.
 
 Changelog
 
+v0.2.1 — 2025-09-15
+
+- Email: Added Brevo SMTP support and task assignment notifications.
+  - Config: Set `BREVO_API_KEY` and `EMAIL_FROM` in `.env` (or keep `EMAIL_SERVER`).
+  - Behavior: Sends an email when a new task is assigned to a user.
+    - On create (`POST /api/tasks`): notifies assignee if not the creator.
+    - On update (`PATCH /api/tasks/[id]`): notifies when `assignedToId` changes to a new user (not self).
+- Messages: Unread badge on mobile footer icon.
+  - API: `GET /api/messages/unread` returns `{ count }` across teams you’re in.
+  - UI: `components/mobile-footer-nav.tsx` polls every 20s and shows a badge.
+
 v0.2.0 — 2025-09-15
 
 - Team Messaging: Added team-wide quick messages UI at `/messages` with optimistic sends, editing, and read receipts.

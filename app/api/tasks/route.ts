@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { sendTaskAssignedEmail } from '@/lib/email'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
@@ -38,5 +39,14 @@ export async function POST(req: NextRequest) {
     data: { ...rest, assignedToId, createdById: user.id, dueDate: dueDate ? new Date(dueDate) : null },
     include: { project: true, assignedTo: true, createdBy: true },
   })
+  // Notify the assignee if it's someone other than the creator and we have their email
+  if (task.assignedTo?.email && task.assignedToId && task.assignedToId !== user.id) {
+    try {
+      await sendTaskAssignedEmail({ to: task.assignedTo.email, task })
+    } catch (e) {
+      // Swallow email errors to not block task creation
+      console.error('Failed to send assignment email:', e)
+    }
+  }
   return Response.json(task, { status: 201 })
 }

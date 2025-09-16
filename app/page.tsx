@@ -16,6 +16,7 @@ export default function LandingPage() {
           <Link href="/dashboard" className="rounded-md bg-white text-black px-4 py-2 text-sm font-medium">Go to Dashboard</Link>
         </SignedIn>
         <a href="#features" className="rounded-md border border-white/20 px-4 py-2 text-sm">Learn more</a>
+        <Link href="/changelog" className="rounded-md border border-white/20 px-4 py-2 text-sm">Changelog</Link>
       </div>
       <div id="features" className="mt-16 grid md:grid-cols-3 gap-4 text-left">
         <div className="rounded-lg border border-white/10 bg-white/5 p-4">

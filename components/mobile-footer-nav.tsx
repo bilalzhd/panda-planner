@@ -1,19 +1,43 @@
 "use client"
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export function MobileFooterNav() {
   const pathname = usePathname()
+  const [unread, setUnread] = useState<number>(0)
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const res = await fetch('/api/messages/unread', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (mounted) setUnread(Number(data?.count || 0))
+      } catch {}
+    }
+    load()
+    const id = setInterval(load, 20000)
+    return () => { mounted = false; clearInterval(id) }
+  }, [])
   const is = (href: string) => pathname === href
-  const item = (href: string, icon: React.ReactNode, label: string) => (
-    <Link
-      href={href}
-      aria-label={label}
-      className={`flex-1 flex items-center justify-center py-2 ${is(href) ? 'text-white' : 'text-white/70'}`}
-    >
-      {icon}
-    </Link>
-  )
+  const item = (href: string, icon: React.ReactNode, label: string, badge?: number) => {
+    const count = Math.max(0, Number(badge || 0))
+    return (
+      <Link
+        href={href}
+        aria-label={label}
+        className={`relative flex-1 flex items-center justify-center py-2 ${is(href) ? 'text-white' : 'text-white/70'}`}
+      >
+        {icon}
+        {count > 0 && (
+          <span className="absolute top-1.5 right-6 rounded-full bg-rose-500 text-[10px] leading-none px-1.5 py-1 text-white">
+            {count > 99 ? '99+' : count}
+          </span>
+        )}
+      </Link>
+    )
+  }
 
   const iconDashboard = (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -45,9 +69,8 @@ export function MobileFooterNav() {
       <div className="flex">
         {item('/dashboard', iconDashboard, 'Dashboard')}
         {item('/todos', iconTodos, 'Todos')}
-        {item('/messages', iconMessages, 'Messages')}
+        {item('/messages', iconMessages, 'Messages', unread)}
       </div>
     </nav>
   )
 }
-
