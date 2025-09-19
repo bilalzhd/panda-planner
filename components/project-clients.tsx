@@ -121,7 +121,7 @@ export function ProjectClientsPanel({ projectId }: { projectId: string }) {
                 <div className="text-sm font-medium">{c.name || c.email || 'Client'}</div>
                 <div className="text-xs text-white/50">{c.email}</div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => removeClient(c.id)}>Remove</Button>
+              <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => removeClient(c.id)}>Remove</Button>
             </li>
           ))}
         </ul>

@@ -29,7 +29,8 @@ export function ProjectNotes({ projectId }: { projectId: string }) {
     extensions: [
       StarterKit.configure({
         heading: { levels: [2,3] },
-        codeBlock: true,
+        // Provide options object instead of boolean to satisfy types
+        codeBlock: {},
       }),
       Underline,
       Link.configure({ openOnClick: true, autolink: true, protocols: ['http', 'https', 'mailto'] }),
@@ -81,7 +82,7 @@ export function ProjectNotes({ projectId }: { projectId: string }) {
           throw new Error(msg)
         }
         const p = await res.json()
-        if (!cancelled) editor?.commands.setContent(p?.notesHtml || '', false)
+        if (!cancelled) editor?.commands.setContent(p?.notesHtml || '', { emitUpdate: false })
       } catch (e: any) {
         setError(e?.message || 'Failed to load')
       } finally {
