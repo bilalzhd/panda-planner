@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select } from '@/components/ui/select'
 
@@ -8,9 +8,9 @@ export const dynamic = 'force-dynamic'
 
 async function getTasks(status?: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   return prisma.task.findMany({
-    where: { project: { teamId: { in: teamIds } }, status: status as any || undefined },
+    where: { project: projectWhere, status: status as any || undefined },
     include: { project: true },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
   })

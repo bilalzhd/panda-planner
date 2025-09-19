@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { timesheetSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const taskId = searchParams.get('taskId') || undefined
   const userId = searchParams.get('userId') || undefined
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const to = searchParams.get('to')
   const timesheets = await prisma.timesheet.findMany({
     where: {
-      task: { project: { teamId: { in: teamIds } } },
+      task: { project: projectWhere },
       taskId,
       userId,
       date: {
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
   const parsed = timesheetSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const task = await prisma.task.findFirst({ where: { id: parsed.data.taskId, project: { teamId: { in: teamIds } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const task = await prisma.task.findFirst({ where: { id: parsed.data.taskId, project: projectWhere } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const { date, ...rest } = parsed.data
   const ts = await prisma.timesheet.create({ data: { ...rest, userId: rest.userId || user.id, date: new Date(date) } })

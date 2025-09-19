@@ -3,9 +3,12 @@ import { useState } from 'react'
 import { Tabs } from '@/components/ui/tabs'
 import { ProjectBoard } from '@/components/project-board'
 import { ProjectMedia } from '@/components/project-media'
+import { ProjectNotes } from '@/components/project-notes'
 import { CredentialsPanel } from '@/components/credentials-panel'
 import { TaskList } from '@/components/task-list'
 import { InlineEdit } from '@/components/inline-edit'
+import { ProjectClientsPanel } from '@/components/project-clients'
+import { FEATURE_PROJECT_CLIENTS } from '@/lib/flags'
 
 type UserLite = { id: string; name: string | null; email: string | null; image: string | null }
 type TaskLite = {
@@ -20,7 +23,7 @@ type TaskLite = {
   timesheets?: { hours: any }[]
 }
 
-export function ProjectTabs({ projectId, tasks, overdue }: { projectId: string; tasks: TaskLite[]; overdue: TaskLite[] }) {
+export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { projectId: string; tasks: TaskLite[]; overdue: TaskLite[]; canManageClients: boolean }) {
   const [active, setActive] = useState('board')
   const [description, setDescription] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -52,7 +55,11 @@ export function ProjectTabs({ projectId, tasks, overdue }: { projectId: string; 
           { key: 'list', label: 'List', icon: iconList },
           { key: 'board', label: 'Board', icon: iconBoard },
           { key: 'files', label: 'Files', icon: iconFiles },
+          { key: 'notes', label: 'Notes', icon: iconNotes },
           { key: 'credentials', label: 'Credentials', icon: iconKey },
+          ...(canManageClients
+            ? [{ key: 'clients', label: 'Clients', icon: iconClients, disabled: !FEATURE_PROJECT_CLIENTS, disabledReason: 'Invite clients to a project — coming soon' }]
+            : []),
         ]}
         initial={active}
         onChange={setActive}
@@ -165,9 +172,21 @@ export function ProjectTabs({ projectId, tasks, overdue }: { projectId: string; 
         </div>
       )}
 
+      {active === 'notes' && (
+        <div className="py-4">
+          <ProjectNotes projectId={projectId} />
+        </div>
+      )}
+
       {active === 'credentials' && (
         <div className="py-4">
           <CredentialsPanel projectId={projectId} />
+        </div>
+      )}
+
+      {active === 'clients' && canManageClients && FEATURE_PROJECT_CLIENTS && (
+        <div className="py-4">
+          <ProjectClientsPanel projectId={projectId} />
         </div>
       )}
     </div>
@@ -207,6 +226,14 @@ const iconFiles = (
   </svg>
 )
 
+const iconNotes = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 3h9l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M15 3v5h5" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 13h8M8 9h5M8 17h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
 function computeHealth(tasks: TaskLite[]) {
   const today = new Date()
   const total = tasks.length || 1
@@ -240,5 +267,13 @@ const iconKey = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="8" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M11 12h9M17 12v4M20 12v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
+
+const iconClients = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M7.5 12a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Zm9 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M1.75 20c.87-2.92 3.74-5 7.25-5 1.1 0 2.15.19 3.11.53" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M14.5 16.5 18 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 )

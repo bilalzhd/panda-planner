@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export const runtime = 'nodejs'
 
@@ -10,8 +10,8 @@ type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const task = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
   const atts = await prisma.attachment.findMany({ where: { taskId: params.id }, orderBy: { createdAt: 'desc' } })
   return Response.json(atts)
@@ -19,8 +19,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function POST(req: NextRequest, { params }: Params) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const task = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
   const form = await req.formData()
   const file = form.get('file') as unknown as File

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
 
@@ -8,13 +8,14 @@ export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const project = await prisma.project.findFirst({
-    where: { id, teamId: { in: teamIds } },
+    where: { id, AND: [projectWhere] },
     include: { tasks: { orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], include: { assignedTo: true, createdBy: true, timesheets: true } } },
   })
   if (!project) notFound()
-  return project
+  const membership = await prisma.membership.findFirst({ where: { teamId: project.teamId, userId: user.id } })
+  return { project, user, canManage: !!membership }
 }
 
 function colorToHex(c?: string | null) {
@@ -40,8 +41,7 @@ function hexToRgb(hex: string) {
 }
 
 export default async function ProjectPage({ params }: { params: { id: string } }) {
-  const project = await getProject(params.id)
-  const { user } = await requireUser()
+  const { project, user, canManage } = await getProject(params.id)
   const startOfToday = new Date(new Date().toDateString())
   const prRank = (p?: string | null) => (p === 'HIGH' ? 0 : p === 'MEDIUM' ? 1 : 2)
   const ownRank = (t: any) => (t.assignedToId === user.id ? 0 : 1)
@@ -75,9 +75,9 @@ export default async function ProjectPage({ params }: { params: { id: string } }
             <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: hex }} />
             {project.name}
           </h1>
-          <DeleteProject projectId={project.id} projectName={project.name} />
+          {canManage && <DeleteProject projectId={project.id} projectName={project.name} />}
         </div>
-        <ProjectTabs projectId={project.id} tasks={project.tasks as any} overdue={overdueAll as any} />
+        <ProjectTabs projectId={project.id} tasks={project.tasks as any} overdue={overdueAll as any} canManageClients={canManage} />
       </div>
     </div>
   )

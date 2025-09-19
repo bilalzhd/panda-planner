@@ -1,18 +1,19 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { getSupabaseAdmin, MEDIA_BUCKET, ensureBucketExists } from '@/lib/supabase'
 
 type Ctx = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
   return Response.json({
     id: project.id,
     description: project.description,
+    notesHtml: (project as any).notesHtml || null,
     health: (project as any).health,
     healthAuto: (project as any).healthAuto,
   })
@@ -20,29 +21,48 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const body = await req.json().catch(() => ({})) as any
 
   // Only allow updates to projects within the user's teams
-  const project = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const data: any = {}
   if (typeof body.description === 'string') data.description = body.description.trim() || null
+  if (typeof body.notesHtml === 'string') data.notesHtml = body.notesHtml
   if (typeof body.health === 'string') data.health = body.health
   if (typeof body.healthAuto === 'boolean') data.healthAuto = body.healthAuto
 
   if (Object.keys(data).length === 0) return Response.json({ ok: true })
 
-  const updated = await prisma.project.update({ where: { id: project.id }, data })
-  return Response.json({ ok: true, project: updated })
+  try {
+    const updated = await prisma.project.update({ where: { id: project.id }, data })
+    return Response.json({ ok: true, project: updated })
+  } catch (err: any) {
+    const msg = String(err?.message || '')
+    // If the DB hasn't been migrated yet, prisma will complain about unknown arg/column.
+    const migrationRelated = msg.includes('notesHtml') || msg.toLowerCase().includes('column') && msg.toLowerCase().includes('notes')
+    if (migrationRelated) {
+      // Best-effort: retry without notesHtml to avoid hard 500s
+      if (typeof data.notesHtml !== 'undefined') {
+        delete (data as any).notesHtml
+        if (Object.keys(data).length) {
+          try { await prisma.project.update({ where: { id: project.id }, data }) } catch {}
+        }
+      }
+      return Response.json({ ok: false, error: 'Notes field not available. Please run database migrations.' }, { status: 409 })
+    }
+    console.error('PATCH /api/projects/[id] failed', err)
+    return Response.json({ ok: false, error: 'Internal Server Error' }, { status: 500 })
+  }
 }
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
 
-  const project = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   // Collect task IDs for cascading deletes

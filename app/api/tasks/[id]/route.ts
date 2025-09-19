@@ -1,16 +1,16 @@
 import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { sendTaskAssignedEmail } from '@/lib/email'
 
 type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({
-    where: { id: params.id, project: { teamId: { in: teamIds } } },
+    where: { id: params.id, project: projectWhere },
     include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -19,8 +19,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const existing = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const existing = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
   const body = await req.json()
   const parsed = taskSchema.partial().safeParse(body)
@@ -46,8 +46,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const existing = await prisma.task.findFirst({ where: { id: params.id, project: { teamId: { in: teamIds } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const existing = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
   // Delete dependent records first to avoid FK constraint errors
   await prisma.comment.deleteMany({ where: { taskId: params.id } })

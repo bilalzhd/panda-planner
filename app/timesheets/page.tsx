@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { TimesheetGrid } from '@/components/timesheet-grid'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { expandSchedules } from '@/lib/schedule'
 import { ScheduleDialog } from '@/components/schedule-dialog'
 import { TimesheetToolbar } from '@/components/timesheet-toolbar'
@@ -14,7 +14,7 @@ function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDat
 
 export default async function TimesheetsPage({ searchParams }: { searchParams: { from?: string; to?: string; range?: string } }) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
 
   const today = startOfDay(new Date())
   const range = searchParams.range || 'week'
@@ -25,9 +25,9 @@ export default async function TimesheetsPage({ searchParams }: { searchParams: {
   const to = searchParams.to ? startOfDay(new Date(searchParams.to)) : defaultTo
 
   const [tasks, entries, schedules] = await Promise.all([
-    prisma.task.findMany({ where: { project: { teamId: { in: teamIds } } }, include: { project: true } }),
+    prisma.task.findMany({ where: { project: projectWhere }, include: { project: true } }),
     prisma.timesheet.findMany({ where: { userId: user.id, date: { gte: from, lte: to } } }),
-    prisma.taskSchedule.findMany({ where: { userId: user.id, task: { project: { teamId: { in: teamIds } } } } }),
+    prisma.taskSchedule.findMany({ where: { userId: user.id, task: { project: projectWhere } } }),
   ])
 
   // Expand schedules to occurrences in the range

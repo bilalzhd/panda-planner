@@ -1,19 +1,19 @@
 import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { sendTaskAssignedEmail } from '@/lib/email'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const projectId = searchParams.get('projectId') || undefined
   const assignedToId = searchParams.get('assignedToId') || undefined
   const status = searchParams.get('status') as any
   const tasks = await prisma.task.findMany({
     where: {
-      project: { teamId: { in: teamIds } },
+      project: projectWhere,
       projectId,
       assignedToId,
       status: status as any,
@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
   const parsed = taskSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const { dueDate, ...rest } = parsed.data
   // If no assignee provided (e.g., quick add), assign to the creator by default

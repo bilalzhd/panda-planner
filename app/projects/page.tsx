@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectScopeForUser, buildProjectWhere } from '@/lib/tenant'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -8,14 +8,17 @@ export const dynamic = 'force-dynamic'
 
 async function getProjects(query?: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const where: any = { teamId: { in: teamIds } }
+  const scope = await projectScopeForUser(user.id)
+  const clauses: any[] = [buildProjectWhere(scope)]
   if (query && query.trim()) {
-    where.OR = [
-      { name: { contains: query, mode: 'insensitive' } },
-      { description: { contains: query, mode: 'insensitive' } },
-    ]
+    clauses.push({
+      OR: [
+        { name: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+      ],
+    })
   }
+  const where = clauses.length > 1 ? { AND: clauses } : clauses[0]
   return prisma.project.findMany({ where, orderBy: { createdAt: 'desc' } })
 }
 

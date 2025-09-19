@@ -1,4 +1,4 @@
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import { ProjectMedia } from '@/components/project-media'
@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id, AND: [projectWhere] } })
   if (!project) notFound()
   return project
 }
@@ -22,4 +22,3 @@ export default async function ProjectMediaPage({ params }: { params: { id: strin
     </div>
   )
 }
-

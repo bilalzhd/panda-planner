@@ -27,17 +27,24 @@ export function getTransport() {
   throw new Error('Email transport not configured. Set BREVO_API_KEY or EMAIL_SERVER')
 }
 
-export async function sendInviteEmail(to: string, acceptUrl: string) {
+export async function sendInviteEmail(to: string, acceptUrl: string, opts?: { projectName?: string }) {
   const from = process.env.EMAIL_FROM || 'noreply@example.com'
   const transporter = getTransport()
   // Optional connectivity verification (fast no-op on many providers)
   try { await transporter.verify() } catch {}
+  const projectName = opts?.projectName?.trim()
+  const subject = projectName
+    ? `You're invited to collaborate on ${projectName}`
+    : 'You have been invited to Mera Kommunikation Task Management'
+  const intro = projectName
+    ? `You have been invited to view updates for the project "${projectName}".`
+    : 'You have been invited to join a team on Mera Kommunikation TM.'
   const info = await transporter.sendMail({
     from,
     to,
-    subject: 'You have been invited to Mera Kommunikation Task Management',
-    text: `You have been invited to join a team on Mera Kommunikation TM. Click to accept: ${acceptUrl}`,
-    html: `<p>You have been invited to join a team on <strong>Mera Kommunikation</strong>.</p><p><a href="${acceptUrl}">Accept invite</a></p>`,
+    subject,
+    text: `${intro} Click to accept: ${acceptUrl}`,
+    html: `<p>${intro}</p><p><a href="${acceptUrl}">Accept invite</a></p>`,
   })
   return info
 }

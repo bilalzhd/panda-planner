@@ -5,15 +5,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { revalidatePath } from 'next/cache'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 
 async function getTask(id: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({
-    where: { id, project: { teamId: { in: teamIds } } },
+    where: { id, project: projectWhere },
     include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true }, orderBy: { createdAt: 'asc' } }, attachments: true, timesheets: { include: { user: true }, orderBy: { date: 'desc' } } },
   })
   if (!task) notFound()
@@ -27,7 +27,8 @@ async function addComment(data: FormData) {
   const content = String(data.get('content') || '')
   if (!content) throw new Error('content required')
   // authorize task
-  const count = await prisma.task.count({ where: { id: taskId, project: { teamId: { in: await teamIdsForUser(user.id) } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const count = await prisma.task.count({ where: { id: taskId, project: projectWhere } })
   if (!count) throw new Error('Forbidden')
   await prisma.comment.create({ data: { taskId, authorId: user.id, content } })
   revalidatePath(`/tasks/${taskId}`)
@@ -44,7 +45,8 @@ async function addTimesheet(data: FormData) {
     date: new Date(String(data.get('date') || new Date().toISOString())),
   }
   // authorize task
-  const count = await prisma.task.count({ where: { id: payload.taskId, project: { teamId: { in: await teamIdsForUser(user.id) } } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const count = await prisma.task.count({ where: { id: payload.taskId, project: projectWhere } })
   if (!count) throw new Error('Forbidden')
   await prisma.timesheet.create({ data: payload })
   revalidatePath(`/tasks/${payload.taskId}`)

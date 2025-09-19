@@ -7,7 +7,7 @@ import { Dialog, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { PROJECT_COLOR_OPTIONS } from '@/lib/validators'
 
-type Project = { id: string; name: string; color?: string | null }
+type Project = { id: string; name: string; color?: string | null; isClient?: boolean }
 
 export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([])
@@ -18,12 +18,21 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [color, setColor] = useState<string>('blue')
   const [loading, setLoading] = useState(false)
   const [navExpanded, setNavExpanded] = useState(false)
+  const [clientOnly, setClientOnly] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
   async function load() {
-    const res = await fetch('/api/projects', { cache: 'no-store' })
-    if (res.ok) setProjects(await res.json())
+    const res = await fetch('/api/projects?scope=1', { cache: 'no-store' })
+    if (!res.ok) return
+    const data = await res.json()
+    if (Array.isArray(data)) {
+      setProjects(data)
+      setClientOnly(false)
+    } else {
+      setProjects(Array.isArray(data?.projects) ? data.projects : [])
+      setClientOnly(!!data?.scope?.isClientOnly)
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -43,7 +52,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
     setDescription('')
     setColor('blue')
     // Optimistically update and navigate
-    setProjects((prev) => [{ id: p.id, name: p.name }, ...prev])
+    setProjects((prev) => [{ id: p.id, name: p.name, color: p.color, isClient: false }, ...prev])
     router.push(`/projects/${p.id}`)
     // Also ensure list refreshed
     load()
@@ -57,22 +66,30 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
       <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-3 p-4 w-full`}>
         <div className={`${navExpanded ? 'max-h-none' : 'max-h-48'} overflow-auto pr-1 -mr-1`}>
         <nav className="flex flex-col gap-1">
-          <SideLink href="/dashboard" active={isActive('/dashboard')} icon={iconDashboard}>Dashboard</SideLink>
-          <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
-          <SideLink href="/tasks" active={isActive('/tasks')} icon={iconTasks}>All Tasks</SideLink>
-          <SideLink href="/timesheets" active={isActive('/timesheets')} icon={iconTimesheets}>Timesheets</SideLink>
-          <SideLink href="/credentials" active={isActive('/credentials')} icon={iconKey}>Credentials</SideLink>
-          <SideLink href="/settings/pin" active={isActive('/settings/pin')} icon={iconLock}>PIN Settings</SideLink>
-          <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
+          {clientOnly ? (
+            <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
+          ) : (
+            <>
+              <SideLink href="/dashboard" active={isActive('/dashboard')} icon={iconDashboard}>Dashboard</SideLink>
+              <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
+              <SideLink href="/tasks" active={isActive('/tasks')} icon={iconTasks}>All Tasks</SideLink>
+              <SideLink href="/timesheets" active={isActive('/timesheets')} icon={iconTimesheets}>Timesheets</SideLink>
+              <SideLink href="/credentials" active={isActive('/credentials')} icon={iconKey}>Credentials</SideLink>
+              <SideLink href="/settings/pin" active={isActive('/settings/pin')} icon={iconLock}>PIN Settings</SideLink>
+              <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
+            </>
+          )}
         </nav>
         </div>
-        <button
-          type="button"
-          className="self-start -mt-1 text-xs text-white/60 hover:text-white/80 px-1"
-          onClick={() => setNavExpanded((v) => !v)}
-        >
-          {navExpanded ? 'Show fewer menu items' : 'Show all menu items'}
-        </button>
+        {!clientOnly && (
+          <button
+            type="button"
+            className="self-start -mt-1 text-xs text-white/60 hover:text-white/80 px-1"
+            onClick={() => setNavExpanded((v) => !v)}
+          >
+            {navExpanded ? 'Show fewer menu items' : 'Show all menu items'}
+          </button>
+        )}
         <div className="mt-4 text-xs uppercase tracking-wide text-white/50 px-1">Projects</div>
         <div className="px-1">
           <Input
@@ -102,27 +119,31 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
             })}
           </ul>
         </div>
-        <Button variant="outline" onClick={() => setOpen(true)}>Add Project</Button>
+        {!clientOnly && (
+          <>
+            <Button variant="outline" onClick={() => setOpen(true)}>Add Project</Button>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogHeader>New Project</DialogHeader>
-          <div className="space-y-2">
-            <Input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <div>
-              <div className="mb-1 text-sm text-white/80">Color</div>
-              <div className="flex flex-wrap gap-2">
-                {PROJECT_COLOR_OPTIONS.map((c) => (
-                  <button key={c} type="button" onClick={() => setColor(c)} className={`h-7 w-7 rounded-full border ${color === c ? 'ring-2 ring-white' : 'border-white/20'}`} style={{ backgroundColor: colorToHex(c) }} />
-                ))}
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogHeader>New Project</DialogHeader>
+              <div className="space-y-2">
+                <Input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
+                <Input placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+                <div>
+                  <div className="mb-1 text-sm text-white/80">Color</div>
+                  <div className="flex flex-wrap gap-2">
+                    {PROJECT_COLOR_OPTIONS.map((c) => (
+                      <button key={c} type="button" onClick={() => setColor(c)} className={`h-7 w-7 rounded-full border ${color === c ? 'ring-2 ring-white' : 'border-white/20'}`} style={{ backgroundColor: colorToHex(c) }} />
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={createProject} disabled={loading}>{loading ? 'Creating...' : 'Create'}</Button>
-          </DialogFooter>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={createProject} disabled={loading}>{loading ? 'Creating...' : 'Create'}</Button>
+              </DialogFooter>
+            </Dialog>
+          </>
+        )}
       </div>
   )
 

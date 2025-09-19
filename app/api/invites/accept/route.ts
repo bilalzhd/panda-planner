@@ -7,13 +7,25 @@ export async function POST(req: Request) {
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token') || (await req.json().then((b) => b?.token).catch(() => undefined))
   if (!token) return Response.json({ error: 'token required' }, { status: 400 })
-  const invite = await prisma.teamInvite.findUnique({ where: { token } })
+  const invite = await prisma.teamInvite.findUnique({ where: { token }, include: { project: true } })
   if (!invite) return Response.json({ error: 'invalid token' }, { status: 400 })
   if (invite.status !== 'PENDING' || invite.expiresAt < new Date()) return Response.json({ error: 'invite expired' }, { status: 400 })
 
   // Optional: verify user email matches invite.email
   if (invite.email && user.email && invite.email.toLowerCase() !== user.email.toLowerCase()) {
     return Response.json({ error: 'email mismatch' }, { status: 400 })
+  }
+  if (invite.type === 'PROJECT_CLIENT') {
+    if (!invite.projectId) return Response.json({ error: 'invalid invite' }, { status: 400 })
+    await prisma.$transaction([
+      prisma.projectAccess.upsert({
+        where: { projectId_userId: { projectId: invite.projectId, userId: user.id } },
+        update: {},
+        create: { projectId: invite.projectId, userId: user.id, role: 'CLIENT' },
+      }),
+      prisma.teamInvite.update({ where: { token }, data: { status: 'ACCEPTED' } }),
+    ])
+    return Response.json({ status: 'accepted', type: invite.type, projectId: invite.projectId })
   }
 
   await prisma.$transaction([
@@ -22,10 +34,11 @@ export async function POST(req: Request) {
       update: {},
       create: { teamId: invite.teamId, userId: user.id, role: 'MEMBER' },
     }),
+    prisma.projectAccess.deleteMany({ where: { projectId: invite.projectId || undefined, userId: user.id } }),
     prisma.teamInvite.update({ where: { token }, data: { status: 'ACCEPTED' } }),
   ])
 
-  return Response.json({ status: 'accepted' })
+  return Response.json({ status: 'accepted', type: invite.type })
 }
 
 export async function GET(req: Request) {
@@ -44,19 +57,34 @@ export async function GET(req: Request) {
   // Resolve the app user via tenant helper (ensures local user row exists)
   const { user } = await requireUser()
 
-  const invite = await prisma.teamInvite.findUnique({ where: { token } })
+  const invite = await prisma.teamInvite.findUnique({ where: { token }, include: { project: true } })
   if (!invite) return Response.json({ error: 'invalid token' }, { status: 400 })
   if (invite.status !== 'PENDING' || invite.expiresAt < new Date()) return Response.json({ error: 'invite expired' }, { status: 400 })
   if (invite.email && user.email && invite.email.toLowerCase() !== user.email.toLowerCase()) {
     // Still accept but note mismatch; alternatively, enforce exact match by returning error
     // return Response.json({ error: 'email mismatch' }, { status: 400 })
   }
+  if (invite.type === 'PROJECT_CLIENT') {
+    if (!invite.projectId) return Response.json({ error: 'invalid invite' }, { status: 400 })
+    await prisma.$transaction([
+      prisma.projectAccess.upsert({
+        where: { projectId_userId: { projectId: invite.projectId, userId: user.id } },
+        update: {},
+        create: { projectId: invite.projectId, userId: user.id, role: 'CLIENT' },
+      }),
+      prisma.teamInvite.update({ where: { token }, data: { status: 'ACCEPTED' } }),
+    ])
+    const target = `/projects/${invite.projectId}?accepted=1`
+    return new Response(null, { status: 302, headers: { Location: target } })
+  }
+
   await prisma.$transaction([
     prisma.membership.upsert({
       where: { teamId_userId: { teamId: invite.teamId, userId: user.id } },
       update: {},
       create: { teamId: invite.teamId, userId: user.id, role: 'MEMBER' },
     }),
+    prisma.projectAccess.deleteMany({ where: { projectId: invite.projectId || undefined, userId: user.id } }),
     prisma.teamInvite.update({ where: { token }, data: { status: 'ACCEPTED' } }),
   ])
 

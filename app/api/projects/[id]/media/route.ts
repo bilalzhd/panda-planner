@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { prisma } from '@/lib/prisma'
 import { getSupabaseAdmin, MEDIA_BUCKET, getPublicUrl, ensureBucketExists } from '@/lib/supabase'
 import { randomUUID } from 'crypto'
@@ -8,8 +8,8 @@ type Ctx = { params: { id: string } }
 
 async function ensureProjectAccess(projectId: string) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id: projectId, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id: projectId, AND: [projectWhere] } })
   if (!project) return null
   return { user, project }
 }

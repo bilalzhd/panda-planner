@@ -1,16 +1,25 @@
 import { prisma } from '@/lib/prisma'
 import { projectSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, projectScopeForUser } from '@/lib/tenant'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const scope = await projectScopeForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const projects = await prisma.project.findMany({
-    where: { teamId: { in: teamIds } },
+    where: projectWhere,
     orderBy: { createdAt: 'desc' },
   })
-  return Response.json(projects)
+  const direct = new Set(scope.projectIds)
+  const enriched = projects.map((p) => ({ ...p, isClient: direct.has(p.id) }))
+  const includeScope = new URL(req.url).searchParams.has('scope')
+  if (includeScope) {
+    const hasTeamProject = enriched.some((p) => !p.isClient)
+    const isClientOnly = !hasTeamProject && enriched.length > 0
+    return Response.json({ projects: enriched, scope: { isClientOnly } })
+  }
+  return Response.json(enriched)
 }
 
 export async function POST(req: NextRequest) {

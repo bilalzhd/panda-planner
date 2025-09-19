@@ -1,14 +1,14 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { credentialSchema } from '@/lib/validators'
 import { encryptSecret } from '@/lib/crypto'
 
 // List credentials for a project (masked)
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const creds = await prisma.credential.findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'desc' } })
@@ -18,8 +18,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // Create a credential for a project
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  const project = await prisma.project.findFirst({ where: { id: params.id, teamId: { in: teamIds } } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()
@@ -41,4 +41,3 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return Response.json({ error: e?.message || 'Failed to save' }, { status: 500 })
   }
 }
-

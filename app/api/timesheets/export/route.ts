@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import PDFDocument from 'pdfkit'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const format = (searchParams.get('format') || 'csv').toLowerCase()
   const from = searchParams.get('from')
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const timesheets = await prisma.timesheet.findMany({
     where: {
       task: {
-        project: { teamId: { in: teamIds } },
+        project: projectWhere,
         ...(projectId ? { projectId } : {}),
       },
       userId,

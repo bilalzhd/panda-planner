@@ -2,19 +2,19 @@ import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { TaskCard } from '@/components/task-card'
 import { KanbanBoard } from '@/components/kanban-board'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { Progress } from '@/components/ui/progress'
 
 export const dynamic = 'force-dynamic'
 
 async function getData() {
   const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const [projects, tasksToday, allTasks, timesheets] = await Promise.all([
-    prisma.project.findMany({ where: { teamId: { in: teamIds } }, orderBy: { createdAt: 'desc' } }),
+    prisma.project.findMany({ where: projectWhere, orderBy: { createdAt: 'desc' } }),
     prisma.task.findMany({
       where: {
-        project: { teamId: { in: teamIds } },
+        project: projectWhere,
         dueDate: {
           gte: new Date(new Date().toDateString()),
           lt: new Date(new Date().setDate(new Date().getDate() + 1)),
@@ -22,8 +22,8 @@ async function getData() {
       },
       orderBy: { dueDate: 'asc' },
     }),
-    prisma.task.findMany({ where: { project: { teamId: { in: teamIds } } }, orderBy: { createdAt: 'desc' } }),
-    prisma.timesheet.findMany({ where: { task: { project: { teamId: { in: teamIds } } } } }),
+    prisma.task.findMany({ where: { project: projectWhere }, orderBy: { createdAt: 'desc' } }),
+    prisma.timesheet.findMany({ where: { task: { project: projectWhere } } }),
   ])
   return { projects, tasksToday, allTasks, timesheets, user }
 }

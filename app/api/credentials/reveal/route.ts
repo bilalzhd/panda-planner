@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { decryptSecret, hashPin, verifyPin } from '@/lib/crypto'
 
 export async function POST(req: NextRequest) {
@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
     if (!ok) return Response.json({ error: 'Invalid PIN' }, { status: 401 })
   }
 
-  const teamIds = await teamIdsForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id)
   const projects = await prisma.project.findMany({
-    where: { teamId: { in: teamIds } },
+    where: projectWhere,
     include: { credentials: true },
     orderBy: { createdAt: 'desc' },
   })
@@ -38,4 +38,3 @@ export async function POST(req: NextRequest) {
 function safeDecrypt(payload: string) {
   try { return decryptSecret(payload) } catch { return '' }
 }
-

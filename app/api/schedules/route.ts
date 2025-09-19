@@ -1,16 +1,17 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { NextRequest } from 'next/server'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
   const { searchParams } = new URL(req.url)
   const taskId = searchParams.get('taskId') || undefined
+  const projectWhere = await projectWhereForUser(user.id)
   const rules = await prisma.taskSchedule.findMany({
     where: {
       userId: user.id,
       taskId,
-      task: { project: { teamId: { in: await teamIdsForUser(user.id) } } },
+      task: { project: projectWhere },
     },
     include: { task: { include: { project: true } } },
     orderBy: { createdAt: 'desc' },
@@ -32,7 +33,8 @@ export async function POST(req: NextRequest) {
   const endDate = body?.endDate ? new Date(body.endDate) : null
 
   // Authorization: ensure the task belongs to one of the requester's teams
-  const task = await prisma.task.findFirst({ where: { id: taskId, project: { teamId: { in: await teamIdsForUser(user.id) } } }, include: { project: true } })
+  const projectWhere = await projectWhereForUser(user.id)
+  const task = await prisma.task.findFirst({ where: { id: taskId, project: projectWhere }, include: { project: true } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   // Allow specifying a target user to schedule for (e.g., Bilal),

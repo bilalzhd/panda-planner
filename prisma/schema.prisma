@@ -51,6 +51,7 @@ model User {
   channelsCreated TeamChannel[]
   channelMemberships ChannelMember[]
   channelMessages ChannelMessage[]
+  projectAccesses ProjectAccess[]
 
   teamsOwned    Team[]      @relation("TeamOwner")
   memberships   Membership[]
@@ -67,6 +68,8 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   description String?
+  // Rich-text HTML notes for this project
+  notesHtml   String?  @db.Text
   color       String?
   health      ProjectHealth @default(ON_TRACK)
   healthAuto  Boolean       @default(true)
@@ -74,8 +77,22 @@ model Project {
   teamId      String
   tasks       Task[]
   credentials Credential[]
+  accesses    ProjectAccess[]
+  clientInvites TeamInvite[] @relation("ProjectInvites")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ProjectAccess {
+  id         String             @id @default(cuid())
+  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  role       ProjectAccessRole  @default(CLIENT)
+  createdAt  DateTime           @default(now())
+
+  @@unique([projectId, userId])
 }
 
 model Credential {
@@ -186,6 +203,11 @@ enum InviteStatus {
   EXPIRED
 }
 
+enum InviteType {
+  TEAM_MEMBER
+  PROJECT_CLIENT
+}
+
 model Team {
   id        String       @id @default(cuid())
   name      String
@@ -215,9 +237,12 @@ model TeamInvite {
   id          String        @id @default(cuid())
   team        Team          @relation(fields: [teamId], references: [id])
   teamId      String
+  project     Project?      @relation("ProjectInvites", fields: [projectId], references: [id])
+  projectId   String?
   email       String
   token       String        @unique
   status      InviteStatus  @default(PENDING)
+  type        InviteType    @default(TEAM_MEMBER)
   invitedBy   User          @relation("InvitedBy", fields: [invitedById], references: [id])
   invitedById String
   expiresAt   DateTime
@@ -323,4 +348,9 @@ enum ProjectHealth {
   ON_TRACK
   AT_RISK
   OFF_TRACK
+}
+
+enum ProjectAccessRole {
+  CLIENT
+  COLLABORATOR
 }
