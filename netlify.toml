@@ -1,0 +1,3 @@
+[build.environment]
+  # So npm doesn't fail installs on peer conflicts in cached lockfiles
+  NPM_FLAGS = "--legacy-peer-deps"
