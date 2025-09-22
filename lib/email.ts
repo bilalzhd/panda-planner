@@ -104,6 +104,17 @@ export async function sendInviteEmail(to: string, acceptUrl: string, opts?: { pr
     text: `${stripHtml(introHtml)}\n\nAccept the invite: ${acceptUrl}\n\nIf you did not expect this email, you can ignore it.`,
     html,
   })
+  if (process.env.EMAIL_DEBUG === 'true') {
+    try {
+      console.log('[email] invite sent', {
+        to,
+        messageId: (info as any)?.messageId,
+        accepted: (info as any)?.accepted,
+        rejected: (info as any)?.rejected,
+        envelope: (info as any)?.envelope,
+      })
+    } catch {}
+  }
   return info
 }
 
@@ -141,13 +152,25 @@ export async function sendTaskAssignedEmail(args: {
     `Open: ${taskUrl}`,
   ].filter(Boolean) as string[]
 
-  return transporter.sendMail({
+  const result = await transporter.sendMail({
     from,
     to,
     subject,
     text: textLines.join('\\n'),
     html,
   })
+  if (process.env.EMAIL_DEBUG === 'true') {
+    try {
+      console.log('[email] task assignment sent', {
+        to,
+        messageId: (result as any)?.messageId,
+        accepted: (result as any)?.accepted,
+        rejected: (result as any)?.rejected,
+        envelope: (result as any)?.envelope,
+      })
+    } catch {}
+  }
+  return result
 }
 
 function escapeHtml(s: string) {
