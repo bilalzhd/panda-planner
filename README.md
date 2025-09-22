@@ -65,8 +65,7 @@ Environment
   - `SUPABASE_MEDIA_SIGNED` (set `true` for private bucket)
   - `SUPABASE_SIGNED_URL_TTL` (signed URL lifetime in seconds)
   - `SUPABASE_SERVICE_ROLE_KEY` (server-side operations)
-# Mera Kommunikation Task Management
-## Changelog
+
 
 For a full changelog, see the dedicated page at `/changelog` when running the app, or the CHANGELOG.md file in the repository.
 
