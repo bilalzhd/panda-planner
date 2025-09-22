@@ -49,6 +49,30 @@ export function getTransport() {
   throw new Error('Email transport not configured. Set BREVO_API_KEY or EMAIL_SERVER')
 }
 
+export function getEmailConfigSummary() {
+  const host = process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com'
+  const port = Number(process.env.BREVO_SMTP_PORT || 587)
+  const login = !!process.env.BREVO_SMTP_LOGIN
+  const password = !!process.env.BREVO_SMTP_PASSWORD
+  const apiKey = !!process.env.BREVO_API_KEY
+  const url = !!process.env.EMAIL_SERVER
+  const method = login && password ? 'brevo-login' : apiKey ? 'brevo-apikey' : url ? 'url' : 'none'
+  const from = process.env.EMAIL_FROM || ''
+  return {
+    method,
+    host,
+    port,
+    secure: false,
+    hasLogin: login,
+    hasPassword: password,
+    hasApiKey: apiKey,
+    hasEmailServerUrl: url,
+    from,
+    node: process.version,
+    env: process.env.NODE_ENV,
+  }
+}
+
 export async function sendInviteEmail(to: string, acceptUrl: string, opts?: { projectName?: string }) {
   const from = process.env.EMAIL_FROM || 'noreply@example.com'
   const transporter = getTransport()

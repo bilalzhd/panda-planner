@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Select } from '@/components/ui/select'
 
 export const dynamic = 'force-dynamic'
 

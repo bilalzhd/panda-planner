@@ -6,3 +6,6 @@
 
 
 schedule - auto generate tasks
+
+in todos page it should show todo on top and done on last - in todos tasks should be clickable and open the task page
+on the task page add option to make the task change status

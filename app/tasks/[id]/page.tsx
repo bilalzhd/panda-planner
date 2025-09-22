@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { revalidatePath } from 'next/cache'
+import { FormSubmit } from '@/components/form-submit'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
@@ -65,6 +66,18 @@ async function uploadAttachment(_prevState: any, data: FormData) {
   if (!res.ok) throw new Error('Upload failed')
 }
 
+async function updateStatus(data: FormData) {
+  'use server'
+  const { user } = await requireUser()
+  const taskId = String(data.get('taskId'))
+  const status = String(data.get('status')) as 'TODO' | 'IN_PROGRESS' | 'DONE'
+  const projectWhere = await projectWhereForUser(user.id)
+  const count = await prisma.task.count({ where: { id: taskId, project: projectWhere } })
+  if (!count) throw new Error('Forbidden')
+  await prisma.task.update({ where: { id: taskId }, data: { status } })
+  revalidatePath(`/tasks/${taskId}`)
+}
+
 export default async function TaskPage({ params }: { params: { id: string } }) {
   const task = await getTask(params.id)
   return (
@@ -74,7 +87,18 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
         <div className="text-lg font-semibold">{task.project.name}</div>
       </div>
       <Card>
-        <CardHeader className="font-semibold">{task.title}</CardHeader>
+        <CardHeader className="font-semibold flex items-center justify-between">
+          <span>{task.title}</span>
+          <form action={updateStatus} className="flex items-center gap-2">
+            <input type="hidden" name="taskId" value={task.id} />
+            <select name="status" defaultValue={task.status} className="h-8 rounded border border-white/10 bg-white/5 px-2 text-sm">
+              <option value="TODO">To Do</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="DONE">Done</option>
+            </select>
+            <FormSubmit pendingText="Updating…" className="h-8 px-2 text-xs">Update</FormSubmit>
+          </form>
+        </CardHeader>
         <CardContent>
           {task.description && <p className="text-white/80 mb-2">{task.description}</p>}
           {task.createdBy && (
@@ -84,8 +108,8 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2">
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="md:col-span-1">
           <CardHeader className="font-semibold">Comments</CardHeader>
           <CardContent>
             <ul className="space-y-3">
@@ -103,7 +127,7 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
             </form>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardHeader className="font-semibold">Attachments</CardHeader>
           <CardContent>
             <ul className="space-y-2">
@@ -120,10 +144,8 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
               <div><Button type="submit">Upload</Button></div>
             </form>
         </CardContent>
-        </Card>
-      </div>
-
-      <Card>
+        </Card>*/}
+        <Card>
         <CardHeader className="font-semibold">Timesheets</CardHeader>
         <CardContent>
           <form action={addTimesheet} className="grid gap-2 md:grid-cols-4 items-end">
@@ -150,6 +172,8 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
           </div>
         </CardContent>
       </Card>
+      </div>
+
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import Link from 'next/link'
 import { expandSchedules } from '@/lib/schedule'
 import { TeamScheduleDialog } from '@/components/team-schedule-dialog'
 
@@ -36,7 +37,7 @@ export default async function TodosPage() {
   for (const m of members) {
     tasksByUser.set(
       m.userId,
-      tasks.filter((t) => (t.assignedToId === m.userId) && t.status !== 'DONE') as any
+      tasks.filter((t) => (t.assignedToId === m.userId)) as any
     )
   }
 
@@ -67,6 +68,8 @@ export default async function TodosPage() {
           const scheduled = (occByUser.get(m.userId) || [])
           const scheduledIds = new Set(scheduled.map((s) => s.taskId))
           const extraAssigned = assigned.filter((t) => !scheduledIds.has(t.id))
+          const extraNotDone = extraAssigned.filter((t) => t.status !== 'DONE')
+          const extraDone = extraAssigned.filter((t) => t.status === 'DONE')
           return (
             <div key={m.userId} className="rounded-lg border border-white/10 bg-white/5 p-3 min-h-[220px]">
               <div className="mb-2 flex items-center justify-between">
@@ -78,18 +81,31 @@ export default async function TodosPage() {
                   const t = taskById.get(s.taskId)
                   if (!t) return null
                   return (
-                    <div key={s.taskId+idx} className="rounded-md border border-amber-500/20 bg-amber-500/10 p-2">
+                    <Link key={s.taskId+idx} href={`/tasks/${t.id}`} className="block rounded-md border border-amber-500/20 bg-amber-500/10 p-2 hover:bg-amber-500/15">
                       <div className="text-sm font-medium">{t.title}</div>
                       <div className="text-[11px] text-white/60">{t.project.name} · {timeRangeLabel(s.timeOfDay, s.durationMin) || 'Scheduled'}</div>
-                    </div>
+                    </Link>
                   )
                 })}
-                {extraAssigned.map((t) => (
-                  <div key={t.id} className="rounded-md border border-white/10 bg-white/5 p-2">
+                {extraNotDone.map((t) => (
+                  <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded-md border border-white/10 bg-white/5 p-2 hover:bg-white/10">
                     <div className="text-sm font-medium">{t.title}</div>
                     <div className="text-[11px] text-white/60">{t.project.name}</div>
-                  </div>
+                  </Link>
                 ))}
+                {extraDone.length > 0 && (
+                  <div className="pt-1">
+                    <div className="mb-1 text-[11px] uppercase tracking-wide text-white/50">Completed</div>
+                    <div className="space-y-1.5">
+                      {extraDone.map((t) => (
+                        <Link key={t.id} href={`/tasks/${t.id}`} className="block rounded-md border border-white/10 bg-white/[0.03] p-2 opacity-70 hover:opacity-100 hover:bg-white/10">
+                          <div className="text-sm">{t.title}</div>
+                          <div className="text-[11px] text-white/60">{t.project.name}</div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {scheduled.length === 0 && assigned.length === 0 && (
                   <div className="text-xs text-white/60">No tasks for today.</div>
                 )}
