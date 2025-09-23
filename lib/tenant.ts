@@ -79,3 +79,13 @@ export async function projectWhereForUser(userId: string) {
   const scope = await projectScopeForUser(userId)
   return buildProjectWhere(scope)
 }
+
+export async function isClientForProject(userId: string, projectId: string) {
+  const access = await prisma.projectAccess.findUnique({ where: { projectId_userId: { projectId, userId } } })
+  if (!access) return false
+  // If they are also a team member, treat them as a normal user
+  const team = await prisma.project.findUnique({ where: { id: projectId }, select: { teamId: true } })
+  if (!team) return false
+  const member = await prisma.membership.findFirst({ where: { teamId: team.teamId, userId } })
+  return !member
+}

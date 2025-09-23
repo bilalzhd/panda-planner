@@ -10,12 +10,14 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const projectWhere = await projectWhereForUser(user.id)
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
+  const hasClients = await prisma.projectAccess.count({ where: { projectId: project.id } }).then((n) => n > 0)
   return Response.json({
     id: project.id,
     description: project.description,
     notesHtml: (project as any).notesHtml || null,
     health: (project as any).health,
     healthAuto: (project as any).healthAuto,
+    hasClients,
   })
 }
 

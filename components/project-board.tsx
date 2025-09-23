@@ -18,9 +18,11 @@ type TaskExtras = Task & {
 type Props = {
   projectId: string
   initialTasks: TaskExtras[]
+  readOnly?: boolean
+  showClientLane?: boolean
 }
 
-export function ProjectBoard({ projectId, initialTasks }: Props) {
+export function ProjectBoard({ projectId, initialTasks, readOnly = false, showClientLane = false }: Props) {
   const router = useRouter()
   const [tasks, setTasks] = useState<TaskExtras[]>(initialTasks)
   const [isPending, startTransition] = useTransition()
@@ -46,14 +48,27 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
   }, [])
 
   const columns = useMemo(() => {
-    return {
+    const map: any = {
       TODO: tasks.filter((t) => t.status === 'TODO'),
       IN_PROGRESS: tasks.filter((t) => t.status === 'IN_PROGRESS'),
+      CLIENT_REVIEW: tasks.filter((t) => (t as any).status === 'CLIENT_REVIEW'),
       DONE: tasks.filter((t) => t.status === 'DONE'),
-    } as Record<TaskStatus, TaskExtras[]>
+    }
+    return map as Record<TaskStatus, TaskExtras[]>
   }, [tasks])
 
+  // Only surface the Client Approval column when it's relevant: either
+  // a client is viewing (readOnly mode) or there are tasks in that lane.
+  const hasClientReview = useMemo(() => tasks.some((t) => (t as any).status === 'CLIENT_REVIEW'), [tasks])
+  const visibleStatuses = useMemo(() => {
+    const list: TaskStatus[] = ['TODO', 'IN_PROGRESS'] as any
+    if (readOnly || showClientLane || hasClientReview) list.push('CLIENT_REVIEW' as any)
+    list.push('DONE')
+    return list
+  }, [readOnly, showClientLane, hasClientReview])
+
   async function moveTask(taskId: string, status: TaskStatus) {
+    if (readOnly) return
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)))
     await fetch(`/api/tasks/${taskId}`, {
       method: 'PATCH',
@@ -64,7 +79,7 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
   }
 
   async function createTask() {
-    if (!title.trim()) return
+    if (readOnly || !title.trim()) return
     setCreating(true)
     const res = await fetch('/api/tasks', {
       method: 'POST',
@@ -94,6 +109,7 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
   }
 
   async function quickAdd(title: string, status: TaskStatus) {
+    if (readOnly) return
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -162,8 +178,8 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {(Object.keys(columns) as TaskStatus[]).map((status) => (
+    <div className={`grid gap-4 ${visibleStatuses.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+      {visibleStatuses.map((status) => (
         <Column
           key={status}
           status={status}
@@ -174,6 +190,7 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
           onAdd={() => setOpen(true)}
           onCreated={() => startTransition(() => router.refresh())}
           onQuickAdd={quickAdd}
+          readOnly={readOnly}
         >
           {columns[status].map((t) => (
             <TaskRow
@@ -183,11 +200,13 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
                 setTasks((prev) => prev.filter((x) => x.id !== id))
                 startTransition(() => router.refresh())
               }}
+              readOnly={readOnly}
             />
           ))}
         </Column>
       ))}
 
+      {!readOnly && (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogHeader>New Task</DialogHeader>
         <div className="grid gap-2">
@@ -221,9 +240,10 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={createTask} disabled={creating}>{creating ? 'Creating...' : 'Create'}</Button>
         </DialogFooter>
-      </Dialog>
+      </Dialog>) }
 
       {/* Edit Task Dialog */}
+      {!readOnly && (
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogHeader>Edit Task</DialogHeader>
         {selected && (
@@ -236,6 +256,7 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
                 <Select value={selected.status} onChange={(e) => setSelected({ ...selected, status: e.target.value as TaskStatus })}>
                   <option value="TODO">TODO</option>
                   <option value="IN_PROGRESS">IN_PROGRESS</option>
+                  <option value="CLIENT_REVIEW">CLIENT_REVIEW</option>
                   <option value="DONE">DONE</option>
                 </Select>
               </label>
@@ -275,12 +296,12 @@ export function ProjectBoard({ projectId, initialTasks }: Props) {
           <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
           <Button onClick={saveEdit} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </DialogFooter>
-      </Dialog>
+      </Dialog>) }
     </div>
   )
 }
 
-function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated, onQuickAdd, children }: {
+function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated, onQuickAdd, children, readOnly }: {
   title: string
   count: number
   status: TaskStatus
@@ -290,6 +311,7 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
   onCreated: () => void
   onQuickAdd: (title: string, status: TaskStatus) => Promise<void> | void
   children: React.ReactNode
+  readOnly: boolean
 }) {
   const [hover, setHover] = useState(false)
   const [dragDepth, setDragDepth] = useState(0)
@@ -315,8 +337,8 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
         <div className="text-sm font-semibold tracking-wide">{title}</div>
         <div className="flex items-center gap-2 text-xs text-white/60">
           <span>{count}</span>
-          <button className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10" onClick={() => setMenuOpen((v) => !v)} aria-label="Column options">{gearIcon}</button>
-          <button className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10" onClick={onAdd} aria-label="New task">+</button>
+          {!readOnly && <button className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10" onClick={() => setMenuOpen((v) => !v)} aria-label="Column options">{gearIcon}</button>}
+          {!readOnly && <button className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10" onClick={onAdd} aria-label="New task">+</button>}
         </div>
         {menuOpen && (
           <div ref={menuRef} className="absolute right-2 top-10 z-10 w-40 rounded-md border border-white/10 bg-[#12151b] text-xs shadow-lg">
@@ -332,7 +354,7 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
           onKeyDown={async (e) => {
-            if (e.key === 'Enter' && quick.trim()) {
+            if (!readOnly && e.key === 'Enter' && quick.trim()) {
               // create minimal task in this column
               const title = quick.trim()
               setQuick('')
@@ -340,6 +362,7 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
               onCreated()
             }
           }}
+          disabled={readOnly}
         />
       </div>
       <div
@@ -373,7 +396,7 @@ function Column({ title, count, status, projectId, onDropTask, onAdd, onCreated,
   )
 }
 
-function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: string) => void }) {
+function TaskRow({ task, onDeleted, readOnly }: { task: TaskExtras; onDeleted?: (id: string) => void; readOnly?: boolean }) {
   const totalHours = (task.timesheets || []).reduce((acc, t) => acc + Number(t.hours || 0), 0)
   const [drag, setDrag] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -386,7 +409,7 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
 
   return (
     <div
-      draggable
+      draggable={!readOnly}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/task-id', task.id)
         e.dataTransfer.effectAllowed = 'move'
@@ -395,8 +418,10 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
       onDragEnd={() => setDrag(false)}
       onClick={() => {
         // dispatch a custom event the board listens to via window for simplicity
-        const ev = new CustomEvent('board:edit', { detail: { taskId: task.id } })
-        window.dispatchEvent(ev)
+        if (!readOnly) {
+          const ev = new CustomEvent('board:edit', { detail: { taskId: task.id } })
+          window.dispatchEvent(ev)
+        }
       }}
       className={`rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-opacity ${drag ? 'opacity-60' : ''}`}
     >
@@ -422,6 +447,7 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
             ) : (
               <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">{initials}</span>
             )}
+            {!readOnly && (
             <button
               type="button"
               className="rounded-full border border-white/20 px-2 py-0.5 hover:bg-white/10"
@@ -449,8 +475,25 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
             >
               {trashIcon}
             </button>
+            )}
           </div>
         </div>
+        {readOnly && (task as any).status === 'CLIENT_REVIEW' && (
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="rounded px-2 py-0.5 text-xs border border-emerald-400/40 text-emerald-300 hover:bg-emerald-500/10"
+              onClick={async (e) => {
+                e.stopPropagation()
+                await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'DONE' }) })
+              }}>Approve</button>
+            <button
+              className="rounded px-2 py-0.5 text-xs border border-rose-400/40 text-rose-300 hover:bg-rose-500/10"
+              onClick={async (e) => {
+                e.stopPropagation()
+                await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'TODO' }) })
+              }}>Needs changes</button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -459,6 +502,7 @@ function TaskRow({ task, onDeleted }: { task: TaskExtras; onDeleted?: (id: strin
 function friendly(s: TaskStatus) {
   if (s === 'TODO') return 'TODO'
   if (s === 'IN_PROGRESS') return 'IN PROGRESS'
+  if ((s as any) === 'CLIENT_REVIEW') return 'CLIENT APPROVAL'
   return 'COMPLETED'
 }
 

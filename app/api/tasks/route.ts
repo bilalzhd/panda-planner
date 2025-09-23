@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, isClientForProject } from '@/lib/tenant'
 import { sendTaskAssignedEmail } from '@/lib/email'
 
 export async function GET(req: NextRequest) {
@@ -32,6 +32,10 @@ export async function POST(req: NextRequest) {
   const projectWhere = await projectWhereForUser(user.id)
   const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  // Clients cannot create tasks
+  if (await isClientForProject(user.id, project.id)) {
+    return Response.json({ error: 'Clients cannot create tasks' }, { status: 403 })
+  }
   const { dueDate, ...rest } = parsed.data
   // If no assignee provided (e.g., quick add), assign to the creator by default
   const assignedToId = rest.assignedToId ?? user.id

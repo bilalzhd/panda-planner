@@ -51,7 +51,7 @@ export default async function DashboardPage() {
       if (pa !== pb) return pa - pb
       return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()
     })
-  const totalTasks = allTasks.length
+  const openTasks = allTasks.filter((t) => (t as any).status !== 'DONE').length
   const doneThisWeek = allTasks.filter((t) => t.status === 'DONE' && t.updatedAt > new Date(Date.now() - 7*24*3600*1000)).length
   const hoursLogged = timesheets.reduce((acc, t) => acc + Number(t.hours), 0)
   return (
@@ -64,8 +64,8 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="font-semibold">Total Tasks</CardHeader>
-          <CardContent><div className="text-3xl font-semibold">{totalTasks}</div></CardContent>
+          <CardHeader className="font-semibold">Open Tasks</CardHeader>
+          <CardContent><div className="text-3xl font-semibold">{openTasks}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="font-semibold">Completed This Week</CardHeader>

@@ -29,6 +29,7 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
   const [loaded, setLoaded] = useState(false)
   const [healthAuto, setHealthAuto] = useState(true)
   const [health, setHealth] = useState<'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK'>(() => computeHealth(tasks))
+  const [hasClients, setHasClients] = useState(false)
 
   // On mount, fetch minimal project info for description + health
   // Using GET on the page already loaded data would be nicer, but we keep it minimal.
@@ -42,6 +43,7 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
           setDescription(p.description || '')
           if (p.health) setHealth(p.health)
           if (typeof p.healthAuto === 'boolean') setHealthAuto(p.healthAuto)
+          if (typeof p.hasClients === 'boolean') setHasClients(!!p.hasClients)
         }
       } catch {}
     })()
@@ -54,11 +56,11 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
           { key: 'overview', label: 'Overview', icon: iconOverview },
           { key: 'list', label: 'List', icon: iconList },
           { key: 'board', label: 'Board', icon: iconBoard },
-          { key: 'files', label: 'Files', icon: iconFiles },
+          ...(canManageClients ? [{ key: 'files', label: 'Files', icon: iconFiles }] : []),
           { key: 'notes', label: 'Notes', icon: iconNotes },
-          { key: 'credentials', label: 'Credentials', icon: iconKey },
-          ...(canManageClients
-            ? [{ key: 'clients', label: 'Clients', icon: iconClients, disabled: !FEATURE_PROJECT_CLIENTS, disabledReason: 'Invite clients to a project — coming soon' }]
+          ...(canManageClients ? [{ key: 'credentials', label: 'Credentials', icon: iconKey }] : []),
+          ...(canManageClients && FEATURE_PROJECT_CLIENTS
+            ? [{ key: 'clients', label: 'Clients', icon: iconClients }]
             : []),
         ]}
         initial={active}
@@ -71,18 +73,22 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
             <div className="md:col-span-2">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="mb-2 text-sm font-semibold">Description</div>
-                <InlineEdit
-                  value={description || ''}
-                  placeholder="Click to add a short project description..."
-                  onSave={async (val) => {
-                    setDescription(val)
-                    await fetch(`/api/projects/${projectId}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ description: val }),
-                    })
-                  }}
-                />
+                {canManageClients ? (
+                  <InlineEdit
+                    value={description || ''}
+                    placeholder="Click to add a short project description..."
+                    onSave={async (val) => {
+                      setDescription(val)
+                      await fetch(`/api/projects/${projectId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ description: val }),
+                      })
+                    }}
+                  />
+                ) : (
+                  <div className="text-sm text-white/70 min-h-6">{description || 'No description'}</div>
+                )}
               </div>
             </div>
             <div>
@@ -162,7 +168,12 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
 
       {active === 'board' && (
         <div className="py-4">
-          <ProjectBoard projectId={projectId} initialTasks={tasks as any} />
+          <ProjectBoard
+            projectId={projectId}
+            initialTasks={tasks as any}
+            readOnly={!canManageClients}
+            showClientLane={FEATURE_PROJECT_CLIENTS && (!!hasClients || !canManageClients)}
+          />
         </div>
       )}
 

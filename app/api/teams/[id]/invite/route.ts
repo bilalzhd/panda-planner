@@ -12,6 +12,22 @@ export async function POST(req: Request, { params }: Params) {
   const body = await req.json()
   const email = String(body?.email || '').toLowerCase().trim()
   if (!email) return Response.json({ error: 'email required' }, { status: 400 })
+
+  // If the user already exists and is already a member of this team, block with a helpful error
+  const existingUser = await prisma.user.findUnique({ where: { email } })
+  if (existingUser) {
+    const membership = await prisma.membership.findFirst({ where: { teamId: team.id, userId: existingUser.id } })
+    if (membership) {
+      return Response.json({ error: 'User is already a member of this team.' }, { status: 400 })
+    }
+  }
+
+  // Prevent duplicate pending invites for the same email and team
+  const pending = await prisma.teamInvite.findFirst({ where: { teamId: team.id, email, status: 'PENDING' } })
+  if (pending) {
+    return Response.json({ error: 'An invite is already pending for this email.' }, { status: 400 })
+  }
+
   const token = randomBytes(16).toString('hex')
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000)
   const invite = await prisma.teamInvite.create({

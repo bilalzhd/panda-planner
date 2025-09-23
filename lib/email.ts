@@ -135,6 +135,7 @@ export async function sendTaskAssignedEmail(args: {
     preheader: `New task: ${task.title}${task?.project?.name ? ` · ${task.project.name}` : ''}`,
     bodyHtml: `
       <p>You have been assigned a new task${task?.project?.name ? ` in project <strong>${escapeHtml(task.project.name)}</strong>` : ''}.</p>
+      <p style=\"margin:4px 0 10px 0;color:#6b7280\">Assigned by: <strong>${escapeHtml(((task as any)?.createdBy?.name) || ((task as any)?.createdBy?.email) || 'System')}</strong></p>
       <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"margin:12px 0 6px 0\">
         <tr><td style=\"padding:6px 0\"><strong>Title:</strong> ${escapeHtml(task.title)}</td></tr>
         ${task.description ? `<tr><td style=\"padding:6px 0\"><strong>Description:</strong> ${escapeHtml(task.description)}</td></tr>` : ''}
@@ -210,27 +211,27 @@ function renderBrandedEmail(args: {
     .preheader { display:none; visibility:hidden; opacity:0; color:transparent; height:0; width:0; overflow:hidden; }
   </style>
 </head>
-<body style="margin:0; background:#0b0e14;">
+<body style="margin:0; background:#f3f4f6;">
   <span class="preheader">${escapeHtml(preheader)}</span>
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#0b0e14;padding:24px 12px">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f3f4f6;padding:24px 12px">
     <tr>
       <td align="center">
-        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#0f1320;border:1px solid rgba(255,255,255,0.08);border-radius:12px;overflow:hidden">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
           <tr>
-            <td style="background:${brandColor};padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08)">
-              <div style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.2px">${escapeHtml(brand)}</div>
+            <td style="background:${brandColor};padding:16px 20px;border-bottom:1px solid #e5e7eb">
+              <div style="color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.2px">${escapeHtml(brand)}</div>
             </td>
           </tr>
           <tr>
-            <td style="padding:22px 20px;color:#e5e7eb;font-size:14px;line-height:1.6">
-              <h1 style="margin:0 0 12px 0;color:#fff;font-size:18px">${escapeHtml(args.title)}</h1>
+            <td style="padding:22px 20px;color:#374151;font-size:14px;line-height:1.6">
+              <h1 style="margin:0 0 12px 0;color:#111827;font-size:18px">${escapeHtml(args.title)}</h1>
               ${args.bodyHtml}
               ${btn ? `<div style=\"margin:18px 0 6px 0\">${btn}</div>` : ''}
-              ${args.action ? `<div style=\"margin-top:8px;color:#9ca3af;font-size:12px;word-break:break-all\">If the button doesn't work, copy and paste this link: <br /><a href=\"${args.action.url}\" style=\"color:${accent}\">${args.action.url}</a></div>` : ''}
+              ${args.action ? `<div style=\"margin-top:8px;color:#6b7280;font-size:12px;word-break:break-all\">If the button doesn't work, copy and paste this link: <br /><a href=\"${args.action.url}\" style=\"color:${accent}\">${args.action.url}</a></div>` : ''}
             </td>
           </tr>
           <tr>
-            <td style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.08);color:#9ca3af;font-size:12px">This message was sent by ${escapeHtml(brand)}.</td>
+            <td style="padding:14px 20px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px">This message was sent by ${escapeHtml(brand)}.</td>
           </tr>
         </table>
       </td>

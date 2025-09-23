@@ -94,6 +94,7 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
             <select name="status" defaultValue={task.status} className="h-8 rounded border border-white/10 bg-white/5 px-2 text-sm">
               <option value="TODO">To Do</option>
               <option value="IN_PROGRESS">In Progress</option>
+              <option value="CLIENT_REVIEW">Client Approval</option>
               <option value="DONE">Done</option>
             </select>
             <FormSubmit pendingText="Updating…" className="h-8 px-2 text-xs">Update</FormSubmit>

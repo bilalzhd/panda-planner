@@ -24,7 +24,7 @@ export const taskSchema = z.object({
   interval: z.number().int().positive().optional().nullable(),
   byWeekday: z.number().int().min(0).max(6).optional().nullable(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'DONE']).optional(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'CLIENT_REVIEW', 'DONE']).optional(),
 })
 
 export const timesheetSchema = z.object({
