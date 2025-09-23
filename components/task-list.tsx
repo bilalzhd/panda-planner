@@ -52,12 +52,15 @@ export function TaskList({ tasks }: { tasks: TaskExtras[] }) {
 }
 
 function StatusBadge({ value }: { value: TaskStatus }) {
-  const map: Record<TaskStatus, string> = {
+  // Use Partial to be resilient if the Prisma enum isn't regenerated yet
+  const map: Partial<Record<TaskStatus, string>> = {
     TODO: 'bg-white/10',
     IN_PROGRESS: 'bg-amber-500/20 text-amber-200',
+    CLIENT_REVIEW: 'bg-sky-500/20 text-sky-200',
     DONE: 'bg-emerald-500/20 text-emerald-200',
   }
-  return <span className={`px-1.5 py-0.5 rounded ${map[value]}`}>{value.replace('_', ' ')}</span>
+  const cls = map[value] || 'bg-white/10'
+  return <span className={`px-1.5 py-0.5 rounded ${cls}`}>{value.replace('_', ' ')}</span>
 }
 
 function PriorityBadge({ value }: { value: TaskPriority }) {
