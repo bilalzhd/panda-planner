@@ -51,7 +51,7 @@ export default async function DashboardPage() {
       if (pa !== pb) return pa - pb
       return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()
     })
-  const openTasks = allTasks.filter((t) => (t as any).status !== 'DONE').length
+  const openTasks = allTasks.filter((t) => (t as any).status === 'TODO').length
   const doneThisWeek = allTasks.filter((t) => t.status === 'DONE' && t.updatedAt > new Date(Date.now() - 7*24*3600*1000)).length
   const hoursLogged = timesheets.reduce((acc, t) => acc + Number(t.hours), 0)
   return (
