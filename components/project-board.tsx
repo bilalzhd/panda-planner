@@ -285,6 +285,18 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
           </div>
         )}
         <DialogFooter>
+          {selected && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditOpen(false)
+                router.push(`/tasks/${selected.id}`)
+              }}
+              title="Open the full task details"
+            >
+              Open Task
+            </Button>
+          )}
           <Button
             variant="outline"
             className="border-red-500/40 text-red-400 hover:text-red-300"
