@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
 import { requireUser, projectWhereForUser, isClientForProject } from '@/lib/tenant'
-import { sendTaskAssignedEmail } from '@/lib/email'
+import { sendTaskAssignedEmail, sendTaskStatusChangedEmail } from '@/lib/email'
 
 type Params = { params: { id: string } }
 
@@ -32,6 +32,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const allowed = existing.status === 'CLIENT_REVIEW' && (rest.status === 'DONE' || rest.status === 'TODO')
     if (!onlyStatus || !allowed) return Response.json({ error: 'Clients may only approve or request changes for items in Client Approval' }, { status: 403 })
   }
+  const statusChanged = typeof rest.status !== 'undefined' && rest.status !== existing.status && typeof rest.status === 'string'
   const task = await prisma.task.update({
     where: { id: params.id },
     data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
@@ -45,6 +46,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       } catch (e) {
         console.error('Failed to send assignment email:', e)
       }
+    }
+  }
+  if (statusChanged && task.createdBy?.email && existing.createdById) {
+    try {
+      await sendTaskStatusChangedEmail({
+        to: task.createdBy.email,
+        task,
+        previousStatus: existing.status,
+        updatedBy: { name: user.name, email: user.email },
+      })
+    } catch (e) {
+      console.error('Failed to send status change email:', e)
     }
   }
   return Response.json(task)

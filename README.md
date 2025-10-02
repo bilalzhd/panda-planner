@@ -4,6 +4,10 @@ Task and project management with timesheets, messaging, and media support.
 
 Changelog
 
+### 2025-10-02
+
+- Added email for tasks status changes
+
 ### 2025-09-20
 
 - Todos page improvements:

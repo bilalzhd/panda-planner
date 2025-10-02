@@ -174,6 +174,134 @@ export async function sendTaskAssignedEmail(args: {
   return result
 }
 
+export async function sendTaskStatusChangedEmail(args: {
+  to: string
+  task: {
+    id: string
+    title: string
+    description?: string | null
+    project?: { name: string } | null
+    dueDate?: Date | null
+    status?: string | null
+  }
+  previousStatus: string
+  updatedBy?: { name?: string | null; email?: string | null } | null
+}) {
+  const { to, task, previousStatus, updatedBy } = args
+  const from = process.env.EMAIL_FROM || 'noreply@example.com'
+  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const taskUrl = `${base}/tasks/${task.id}`
+  const formattedPrev = formatTaskStatus(previousStatus)
+  const formattedNext = formatTaskStatus(task.status || '')
+  const changer = updatedBy?.name || updatedBy?.email || 'Team member'
+  const subject = `Task status updated: ${task.title}`
+  const transporter = getTransport()
+  try { await transporter.verify() } catch {}
+  const html = renderBrandedEmail({
+    title: 'Task Status Updated',
+    preheader: `${escapeHtml(task.title)} moved to ${escapeHtml(formattedNext)}`,
+    bodyHtml: `
+      <p>The task <strong>${escapeHtml(task.title)}</strong>${task?.project?.name ? ` in project <strong>${escapeHtml(task.project.name)}</strong>` : ''} had its status updated.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:12px 0 6px 0">
+        <tr><td style="padding:6px 0"><strong>Updated by:</strong> ${escapeHtml(changer)}</td></tr>
+        <tr><td style="padding:6px 0"><strong>Previous status:</strong> ${escapeHtml(formattedPrev)}</td></tr>
+        <tr><td style="padding:6px 0"><strong>New status:</strong> ${escapeHtml(formattedNext)}</td></tr>
+        ${task?.dueDate ? `<tr><td style=\"padding:6px 0\"><strong>Due:</strong> ${escapeHtml(new Date(task.dueDate).toLocaleDateString())}</td></tr>` : ''}
+      </table>
+      ${task.description ? `<p style=\"margin:16px 0 0 0\"><strong>Description</strong><br />${escapeHtml(task.description)}</p>` : ''}
+    `,
+    action: { label: 'Review Task', url: taskUrl },
+  })
+
+  const textLines = [
+    `The task "${task.title}" had its status updated${task?.project?.name ? ` in project "${task.project.name}"` : ''}.`,
+    `Updated by: ${changer}`,
+    `Previous status: ${formattedPrev}`,
+    `New status: ${formattedNext}`,
+    task?.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : undefined,
+    `Open: ${taskUrl}`,
+  ].filter(Boolean) as string[]
+
+  const result = await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text: textLines.join('\n'),
+    html,
+  })
+  if (process.env.EMAIL_DEBUG === 'true') {
+    try {
+      console.log('[email] task status update sent', {
+        to,
+        messageId: (result as any)?.messageId,
+        accepted: (result as any)?.accepted,
+        rejected: (result as any)?.rejected,
+        envelope: (result as any)?.envelope,
+      })
+    } catch {}
+  }
+  return result
+}
+
+export async function sendTaskDueReminderEmail(args: {
+  to: string
+  task: {
+    id: string
+    title: string
+    description?: string | null
+    project?: { name: string } | null
+    dueDate?: Date | null
+    status?: string | null
+  }
+}) {
+  const { to, task } = args
+  const from = process.env.EMAIL_FROM || 'noreply@example.com'
+  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const taskUrl = `${base}/tasks/${task.id}`
+  const due = task?.dueDate ? new Date(task.dueDate).toLocaleDateString() : null
+  const subject = `Reminder: "${task.title}" is due today`
+  const transporter = getTransport()
+  try { await transporter.verify() } catch {}
+  const html = renderBrandedEmail({
+    title: 'Task Due Today',
+    preheader: `${escapeHtml(task.title)} is due today`,
+    bodyHtml: `
+      <p>This is a reminder that the task <strong>${escapeHtml(task.title)}</strong>${task?.project?.name ? ` in project <strong>${escapeHtml(task.project.name)}</strong>` : ''} is due today.</p>
+      ${due ? `<p style=\"margin:4px 0\"><strong>Due:</strong> ${escapeHtml(due)}</p>` : ''}
+      ${task.status ? `<p style=\"margin:4px 0\"><strong>Current status:</strong> ${escapeHtml(formatTaskStatus(task.status))}</p>` : ''}
+      ${task.description ? `<p style=\"margin:16px 0 0 0\"><strong>Description</strong><br />${escapeHtml(task.description)}</p>` : ''}
+    `,
+    action: { label: 'View Task', url: taskUrl },
+  })
+
+  const textLines = [
+    `Reminder: the task "${task.title}"${task?.project?.name ? ` in project "${task.project.name}"` : ''} is due today.`,
+    task.status ? `Current status: ${formatTaskStatus(task.status)}` : undefined,
+    due ? `Due: ${due}` : undefined,
+    `Open: ${taskUrl}`,
+  ].filter(Boolean) as string[]
+
+  const result = await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text: textLines.join('\n'),
+    html,
+  })
+  if (process.env.EMAIL_DEBUG === 'true') {
+    try {
+      console.log('[email] task due reminder sent', {
+        to,
+        messageId: (result as any)?.messageId,
+        accepted: (result as any)?.accepted,
+        rejected: (result as any)?.rejected,
+        envelope: (result as any)?.envelope,
+      })
+    } catch {}
+  }
+  return result
+}
+
 function escapeHtml(s: string) {
   return s
     .replaceAll('&', '&amp;')
@@ -239,4 +367,14 @@ function renderBrandedEmail(args: {
   </table>
 </body>
 </html>`
+}
+
+function formatTaskStatus(status: string) {
+  const map: Record<string, string> = {
+    TODO: 'To Do',
+    IN_PROGRESS: 'In Progress',
+    CLIENT_REVIEW: 'Client Review',
+    DONE: 'Done',
+  }
+  return map[status] || status || 'Unknown'
 }
