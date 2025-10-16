@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
+import { EditableProjectTitle } from '@/components/editable-project-title'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,11 +71,10 @@ export default async function ProjectPage({ params }: { params: { id: string } }
         }}
       />
       <div className="space-y-2">
-        <div className="flex items-center justify-between py-1">
-          <h1 className="text-lg font-semibold flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: hex }} />
-            {project.name}
-          </h1>
+        <div className="flex items-center justify-between gap-3 py-1">
+          <div className="flex-1 min-w-0">
+            <EditableProjectTitle projectId={project.id} initialName={project.name} colorHex={hex} canEdit={canManage} />
+          </div>
           {canManage && <DeleteProject projectId={project.id} projectName={project.name} />}
         </div>
         <ProjectTabs projectId={project.id} tasks={project.tasks as any} overdue={overdueAll as any} canManageClients={canManage} />

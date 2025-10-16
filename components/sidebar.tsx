@@ -36,6 +36,16 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   }
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; name: string }>).detail
+      if (!detail || typeof detail.id !== 'string' || typeof detail.name !== 'string') return
+      setProjects((prev) => prev.map((p) => (p.id === detail.id ? { ...p, name: detail.name } : p)))
+    }
+    window.addEventListener('project:renamed', handler)
+    return () => window.removeEventListener('project:renamed', handler)
+  }, [])
+
   async function createProject() {
     if (!name.trim()) return
     setLoading(true)

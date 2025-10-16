@@ -31,6 +31,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const data: any = {}
+  if (typeof body.name === 'string') {
+    const name = body.name.trim()
+    if (!name) {
+      return Response.json({ ok: false, error: 'Project name is required' }, { status: 400 })
+    }
+    data.name = name
+  }
   if (typeof body.description === 'string') data.description = body.description.trim() || null
   if (typeof body.notesHtml === 'string') data.notesHtml = body.notesHtml
   if (typeof body.health === 'string') data.health = body.health
