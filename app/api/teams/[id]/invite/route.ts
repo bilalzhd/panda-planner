@@ -23,10 +23,10 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   // Prevent duplicate pending invites for the same email and team
-  const pending = await prisma.teamInvite.findFirst({ where: { teamId: team.id, email, status: 'PENDING' } })
-  if (pending) {
-    return Response.json({ error: 'An invite is already pending for this email.' }, { status: 400 })
-  }
+  // const pending = await prisma.teamInvite.findFirst({ where: { teamId: team.id, email, status: 'PENDING' } })
+  // if (pending) {
+  //   return Response.json({ error: 'An invite is already pending for this email.' }, { status: 400 })
+  // }
 
   const token = randomBytes(16).toString('hex')
   const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000)
