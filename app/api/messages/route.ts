@@ -1,54 +1,89 @@
-import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
-import { getTransport } from '@/lib/email'
+import { prisma } from '@/lib/prisma'
+import { requireUser, isSuperAdmin } from '@/lib/tenant'
+import { sendDirectMessageEmail } from '@/lib/email'
 
-export const dynamic = 'force-dynamic'
+async function getSharedProjects(userId: string, partnerId: string) {
+  const mine = await prisma.projectAccess.findMany({
+    where: { userId },
+    select: { projectId: true },
+  })
+  const projectIds = mine.map((p) => p.projectId)
+  if (projectIds.length === 0) return []
+  const shared = await prisma.projectAccess.findMany({
+    where: { userId: partnerId, projectId: { in: projectIds } },
+    include: { project: { select: { id: true, name: true } } },
+  })
+  return shared
+    .map((s) => ({ id: s.projectId, name: s.project?.name || 'Project' }))
+}
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
   const { searchParams } = new URL(req.url)
-  const teamId = searchParams.get('teamId') || undefined
-  const allowed = new Set(await teamIdsForUser(user.id))
-  const tid = teamId && allowed.has(teamId) ? teamId : (Array.from(allowed)[0] || null)
-  if (!tid) return Response.json([])
-  const items = await (prisma as any).teamMessage.findMany({
-    where: { teamId: tid },
-    include: { author: true, reads: { include: { user: true } } },
+  const partnerId = searchParams.get('partnerId')
+  if (!partnerId) return Response.json({ error: 'partnerId required' }, { status: 400 })
+  const partner = await prisma.user.findUnique({ where: { id: partnerId } })
+  if (!partner) return Response.json({ error: 'Not found' }, { status: 404 })
+  const currentIsSuper = isSuperAdmin(user)
+  const partnerIsSuper = isSuperAdmin(partner)
+  let shared = await getSharedProjects(user.id, partnerId)
+  if (!currentIsSuper && !partnerIsSuper && shared.length === 0) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const messages = await prisma.userMessage.findMany({
+    where: {
+      OR: [
+        { senderId: user.id, receiverId: partnerId },
+        { senderId: partnerId, receiverId: user.id },
+      ],
+    },
     orderBy: { createdAt: 'asc' },
-    take: 500,
+    include: { sender: { select: { id: true, name: true, email: true } } },
   })
-  return Response.json(items)
+  return Response.json({ messages, sharedProjects: shared })
 }
 
 export async function POST(req: NextRequest) {
   const { user } = await requireUser()
-  const body = await req.json()
-  const teamId = String(body?.teamId || '')
+  const body = await req.json().catch(() => ({}))
+  const receiverId = String(body?.receiverId || '')
   const content = String(body?.content || '').trim()
-  if (!content) return Response.json({ error: 'Content required' }, { status: 400 })
-  // Auth: user must be a member of teamId
-  const allowed = new Set(await teamIdsForUser(user.id))
-  if (!allowed.has(teamId)) return Response.json({ error: 'Forbidden' }, { status: 403 })
-  const created = await (prisma as any).teamMessage.create({
-    data: { teamId, authorId: user.id, content },
-    include: { author: true, reads: { include: { user: true } } },
+  if (!receiverId || !content) {
+    return Response.json({ error: 'receiverId and content required' }, { status: 400 })
+  }
+  const partner = await prisma.user.findUnique({ where: { id: receiverId } })
+  if (!partner) return Response.json({ error: 'User not found' }, { status: 404 })
+  if (partner.id === user.id) return Response.json({ error: 'Cannot message yourself' }, { status: 400 })
+  const currentIsSuper = isSuperAdmin(user)
+  const partnerIsSuper = isSuperAdmin(partner)
+  const shared = await getSharedProjects(user.id, receiverId)
+  if (!currentIsSuper && !partnerIsSuper && shared.length === 0) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const projectId = shared[0]?.id || null
+  const created = await prisma.userMessage.create({
+    data: {
+      senderId: user.id,
+      receiverId,
+      projectId,
+      content,
+    },
+    include: { sender: { select: { id: true, name: true, email: true } } },
   })
-  try {
-    const members = await prisma.membership.findMany({ where: { teamId }, include: { user: { include: { notificationPref: true } } } })
-    // Default behavior: notify if no preference is set yet (opt-out available in Settings)
-    const toNotify = members
-      .map((m) => m.user)
-      .filter((u) => u.id !== user.id && !!u.email && (u.notificationPref?.emailTeamMessage ?? true))
-    if (toNotify.length > 0) {
-      const tx = getTransport()
-      const base = process.env.NEXT_PUBLIC_BASE_URL || ''
-      const subject = 'New team message'
-      const text = `${user.name || user.email || 'Someone'} posted:\n\n${content}\n\nOpen: ${base}/messages?teamId=${teamId}`
-      await Promise.allSettled(toNotify.map((u) => tx.sendMail({ from: process.env.EMAIL_FROM || 'noreply@example.com', to: u.email!, subject, text })))
+  const pref = await prisma.notificationPreference.findUnique({ where: { userId: receiverId } })
+  if ((pref?.emailDirectMessage ?? true) && partner.email) {
+    try {
+      await sendDirectMessageEmail({
+        to: partner.email,
+        recipientName: partner.name,
+        sender: { name: user.name, email: user.email },
+        content,
+        projectName: shared[0]?.name,
+      })
+    } catch (e) {
+      console.error('Failed to send direct message email', e)
     }
-  } catch (e) {
-    console.error('Message email notify failed', e)
   }
   return Response.json(created, { status: 201 })
 }

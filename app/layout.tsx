@@ -1,7 +1,7 @@
 import './globals.css'
 import { ReactNode } from 'react'
 import Link from 'next/link'
-import { ClerkProvider, SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs'
+import { ClerkProvider, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { AppShell } from '@/components/app-shell'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Sidebar } from '@/components/sidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { MobileFooterNav } from '@/components/mobile-footer-nav'
 import { MainNavLinks } from '@/components/main-nav-links'
+import { WorkspaceSwitcher } from '@/components/workspace-switcher'
 
 export const metadata = {
   title: 'Mera Kommunikation Task Management',
@@ -18,7 +19,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/dashboard"
+      afterSignUpUrl="/dashboard"
+    >
       <html lang="en">
         <body className="min-h-screen antialiased">
           <script dangerouslySetInnerHTML={{__html: `try{var t=localStorage.getItem('pp-theme'); if(t==='light'){document.documentElement.classList.add('theme-light')}}catch(e){}`}} />
@@ -44,18 +50,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <nav className="hidden md:flex items-center gap-4 text-sm text-white/80">
                 <MainNavLinks />
                 <SignedIn>
+                  <WorkspaceSwitcher />
+                </SignedIn>
+                <SignedIn>
                   <ThemeToggle />
                 </SignedIn>
                 <SignedOut>
-                  <SignInButton mode="modal">
-                    <button className="rounded-md border border-white/10 bg-white/10 px-3 py-1 text-sm">Sign In</button>
-                  </SignInButton>
+                  <Link href="/sign-in" className="rounded-md border border-white/10 bg-white/10 px-3 py-1 text-sm">Sign In</Link>
                 </SignedOut>
                 <SignedIn>
                   <UserButton appearance={{ elements: { userButtonAvatarBox: 'w-8 h-8' } }} />
                 </SignedIn>
               </nav>
             </div>
+            <SignedIn>
+              <div className="md:hidden border-t border-white/10 px-4 py-2">
+                <WorkspaceSwitcher />
+              </div>
+            </SignedIn>
           </header>
           <main>
             <AppShell>

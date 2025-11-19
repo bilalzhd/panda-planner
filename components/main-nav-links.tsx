@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 export function MainNavLinks() {
-  const [clientOnly, setClientOnly] = useState(false)
+  const [readOnlyMode, setReadOnlyMode] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -14,18 +14,18 @@ export function MainNavLinks() {
         if (!res.ok) return
         const data = await res.json()
         if (Array.isArray(data)) {
-          setClientOnly(false)
+          setReadOnlyMode(false)
         } else {
-          setClientOnly(!!data?.scope?.isClientOnly)
+          setReadOnlyMode(!data?.scope?.hasEditableProjects)
         }
       } catch {
-        setClientOnly(false)
+        setReadOnlyMode(false)
       }
     }
     load()
   }, [])
 
-  if (clientOnly) {
+  if (readOnlyMode) {
     return (
       <>
         <NavLink href="/projects" active={pathname === '/projects'}>Projects</NavLink>

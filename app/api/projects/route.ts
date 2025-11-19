@@ -1,25 +1,52 @@
 import { prisma } from '@/lib/prisma'
 import { projectSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, projectWhereForUser, projectScopeForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, projectScopeForUser, getUserCapability } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
   const scope = await projectScopeForUser(user.id)
-  const projectWhere = await projectWhereForUser(user.id)
-  const projects = await prisma.project.findMany({
-    where: projectWhere,
-    orderBy: { createdAt: 'desc' },
+  const params = new URL(req.url).searchParams
+  const includeArchived = params.has('includeArchived')
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived })
+  const activeWhere = includeArchived ? { AND: [projectWhere, { archivedAt: null }] } : projectWhere
+  const [projects, archived] = await Promise.all([
+    prisma.project.findMany({
+      where: activeWhere,
+      orderBy: { createdAt: 'desc' },
+    }),
+    includeArchived
+      ? prisma.project.findMany({
+          where: { AND: [projectWhere, { archivedAt: { not: null } }] },
+          orderBy: { archivedAt: 'desc' },
+        })
+      : Promise.resolve([]),
+  ])
+  const enriched = projects.map((p) => {
+    const accessLevel = scope.isSuperAdmin ? 'EDIT' : scope.accessMap[p.id] || 'READ'
+    return { ...p, accessLevel }
   })
-  const direct = new Set(scope.projectIds)
-  const enriched = projects.map((p) => ({ ...p, isClient: direct.has(p.id) }))
-  const includeScope = new URL(req.url).searchParams.has('scope')
-  if (includeScope) {
-    const hasTeamProject = enriched.some((p) => !p.isClient)
-    const isClientOnly = !hasTeamProject && enriched.length > 0
-    return Response.json({ projects: enriched, scope: { isClientOnly } })
+  const includeScope = params.has('scope')
+  const payload: any = includeScope || includeArchived ? { projects: enriched } : enriched
+  if (includeArchived) {
+    payload.archivedProjects = archived.map((p) => {
+      const accessLevel = scope.isSuperAdmin ? 'EDIT' : scope.accessMap[p.id] || 'READ'
+      return { ...p, accessLevel }
+    })
   }
-  return Response.json(enriched)
+  if (includeScope) {
+    const capability = await getUserCapability(user.id)
+    const hasEditableProjects = scope.isSuperAdmin || enriched.some((p) => p.accessLevel === 'EDIT')
+    payload.scope = {
+      hasEditableProjects,
+      isSuperAdmin: capability.isSuperAdmin,
+      canAccessUsers: capability.canAccessUsers,
+      canCreateUsers: capability.canCreateUsers,
+      canEditUsers: capability.canEditUsers,
+      canDeleteUsers: capability.canDeleteUsers,
+    }
+  }
+  return Response.json(payload)
 }
 
 export async function POST(req: NextRequest) {
@@ -45,5 +72,8 @@ export async function POST(req: NextRequest) {
   }
 
   const project = await prisma.project.create({ data: { ...parsed.data, teamId } })
+  await prisma.projectAccess.create({
+    data: { projectId: project.id, userId: user.id, accessLevel: 'EDIT' },
+  }).catch(() => {})
   return Response.json(project, { status: 201 })
 }

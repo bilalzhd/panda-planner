@@ -1,22 +1,33 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, isSuperAdmin } from '@/lib/tenant'
 import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
 import { EditableProjectTitle } from '@/components/editable-project-title'
+import { ArchiveProject } from '@/components/archive-project'
 
 export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({
     where: { id, AND: [projectWhere] },
     include: { tasks: { orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], include: { assignedTo: true, createdBy: true, timesheets: true } } },
   })
   if (!project) notFound()
-  const membership = await prisma.membership.findFirst({ where: { teamId: project.teamId, userId: user.id } })
-  return { project, user, canManage: !!membership }
+  const superAdmin = isSuperAdmin(user)
+  const directAccess = superAdmin
+    ? null
+    : await prisma.projectAccess.findUnique({ where: { projectId_userId: { projectId: project.id, userId: user.id } } })
+  if (directAccess) {
+    await prisma.projectAccess.update({
+      where: { projectId_userId: { projectId: project.id, userId: user.id } },
+      data: { lastSeenAt: new Date() },
+    })
+  }
+  const accessLevel = superAdmin ? 'EDIT' : directAccess?.accessLevel || 'READ'
+  return { project, user, accessLevel }
 }
 
 function colorToHex(c?: string | null) {
@@ -41,9 +52,11 @@ function hexToRgb(hex: string) {
   return { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) }
 }
 
-export default async function ProjectPage({ params }: { params: { id: string } }) {
-  const { project, user, canManage } = await getProject(params.id)
+export default async function ProjectPage({ params, searchParams }: { params: { id: string }; searchParams?: { tab?: string } }) {
+  const { project, user, accessLevel } = await getProject(params.id)
+  const initialTab = searchParams?.tab || undefined
   const startOfToday = new Date(new Date().toDateString())
+  const isArchived = !!project.archivedAt
   const prRank = (p?: string | null) => (p === 'HIGH' ? 0 : p === 'MEDIUM' ? 1 : 2)
   const ownRank = (t: any) => (t.assignedToId === user.id ? 0 : 1)
   const overdueAll = (project.tasks as any[])
@@ -73,11 +86,30 @@ export default async function ProjectPage({ params }: { params: { id: string } }
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3 py-1">
           <div className="flex-1 min-w-0">
-            <EditableProjectTitle projectId={project.id} initialName={project.name} colorHex={hex} canEdit={canManage} />
+            <EditableProjectTitle projectId={project.id} initialName={project.name} colorHex={hex} canEdit={accessLevel === 'EDIT'} />
+            {isArchived && (
+              <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/70">
+                <span className="h-2 w-2 rounded-full bg-amber-400" /> Archived
+              </div>
+            )}
           </div>
-          {canManage && <DeleteProject projectId={project.id} projectName={project.name} />}
+          <div className="flex items-center gap-2">
+            {accessLevel === 'EDIT' && (
+              <>
+                <ArchiveProject projectId={project.id} projectName={project.name} archivedAt={project.archivedAt} />
+                <DeleteProject projectId={project.id} projectName={project.name} />
+              </>
+            )}
+          </div>
         </div>
-        <ProjectTabs projectId={project.id} tasks={project.tasks as any} overdue={overdueAll as any} canManageClients={canManage} />
+        <ProjectTabs
+          projectId={project.id}
+          tasks={project.tasks as any}
+          overdue={overdueAll as any}
+          accessLevel={accessLevel as 'READ' | 'EDIT'}
+          initialTab={initialTab}
+          isArchived={isArchived}
+        />
       </div>
     </div>
   )

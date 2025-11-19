@@ -23,6 +23,7 @@ export function DeleteProject({ projectId, projectName }: { projectId: string; p
       const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
       if (res.ok) {
         setOpen(false)
+        window.dispatchEvent(new Event('projects:refresh'))
         router.push('/projects')
         router.refresh()
       }
@@ -68,4 +69,3 @@ export function DeleteProject({ projectId, projectName }: { projectId: string; p
     </>
   )
 }
-

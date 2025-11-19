@@ -1,15 +1,17 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { credentialSchema } from '@/lib/validators'
 import { encryptSecret } from '@/lib/crypto'
 
 // List credentials for a project (masked)
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, project.id, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
 
   const creds = await prisma.credential.findMany({ where: { projectId: project.id }, orderBy: { createdAt: 'desc' } })
   return Response.json(creds.map(c => ({ id: c.id, label: c.label, username: c.username, masked: true })))
@@ -18,9 +20,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // Create a credential for a project
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, project.id, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
 
   const body = await req.json()
   const parsed = credentialSchema.safeParse(body)

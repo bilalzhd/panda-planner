@@ -1,34 +1,37 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { getSupabaseAdmin, MEDIA_BUCKET, ensureBucketExists } from '@/lib/supabase'
 
 type Ctx = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
-  const hasClients = await prisma.projectAccess.count({ where: { projectId: project.id } }).then((n) => n > 0)
+  const accessLevel = (await ensureProjectPermission(user, project.id, 'READ')) || 'READ'
   return Response.json({
     id: project.id,
     description: project.description,
     notesHtml: (project as any).notesHtml || null,
+    archivedAt: (project as any).archivedAt || null,
     health: (project as any).health,
     healthAuto: (project as any).healthAuto,
-    hasClients,
+    accessLevel,
   })
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const body = await req.json().catch(() => ({})) as any
 
   // Only allow updates to projects within the user's teams
-  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] }, include: { team: true } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, project.id, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const data: any = {}
   if (typeof body.name === 'string') {
@@ -42,6 +45,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (typeof body.notesHtml === 'string') data.notesHtml = body.notesHtml
   if (typeof body.health === 'string') data.health = body.health
   if (typeof body.healthAuto === 'boolean') data.healthAuto = body.healthAuto
+  if (typeof body.archived === 'boolean') {
+    data.archivedAt = body.archived ? new Date() : null
+  }
 
   if (Object.keys(data).length === 0) return Response.json({ ok: true })
 
@@ -51,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   } catch (err: any) {
     const msg = String(err?.message || '')
     // If the DB hasn't been migrated yet, prisma will complain about unknown arg/column.
-    const migrationRelated = msg.includes('notesHtml') || msg.toLowerCase().includes('column') && msg.toLowerCase().includes('notes')
+    const migrationRelated = msg.includes('notesHtml') || msg.includes('archivedAt') || msg.toLowerCase().includes('column') && (msg.toLowerCase().includes('notes') || msg.toLowerCase().includes('archive'))
     if (migrationRelated) {
       // Best-effort: retry without notesHtml to avoid hard 500s
       if (typeof data.notesHtml !== 'undefined') {
@@ -60,7 +66,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           try { await prisma.project.update({ where: { id: project.id }, data }) } catch {}
         }
       }
-      return Response.json({ ok: false, error: 'Notes field not available. Please run database migrations.' }, { status: 409 })
+      if (typeof data.archivedAt !== 'undefined') {
+        delete (data as any).archivedAt
+        if (Object.keys(data).length) {
+          try { await prisma.project.update({ where: { id: project.id }, data }) } catch {}
+        }
+      }
+      return Response.json({ ok: false, error: 'Notes/archive fields not available. Please run database migrations.' }, { status: 409 })
     }
     console.error('PATCH /api/projects/[id] failed', err)
     return Response.json({ ok: false, error: 'Internal Server Error' }, { status: 500 })
@@ -69,10 +81,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
 export async function DELETE(_req: NextRequest, { params }: Ctx) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
 
-  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
+  const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] }, include: { team: true } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, project.id, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   // Collect task IDs for cascading deletes
   const tasks = await prisma.task.findMany({ where: { projectId: project.id }, select: { id: true } })

@@ -2,8 +2,8 @@ import { prisma } from '@/lib/prisma'
 import { requireUser, teamIdsForUser } from '@/lib/tenant'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { InviteForm } from '@/components/invite-form'
 import { RemoveMemberButton } from '@/components/remove-member-button'
+import { Button } from '@/components/ui/button'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,14 +49,15 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="font-semibold">Invite a teammate</CardHeader>
-          <CardContent>
-            <InviteForm teamId={currentTeamId} />
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="font-semibold">Manage access</CardHeader>
+        <CardContent className="space-y-2 text-sm text-white/70">
+          <p>Invitations have moved to the new Users screen where you can grant project access and user-management permissions.</p>
+          <Button asChild variant="outline" className="text-sm">
+            <Link href="/users">Open Users</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <ul className="space-y-4">
         {members.map((m) => {

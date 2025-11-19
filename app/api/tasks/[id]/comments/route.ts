@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 
 type Params = { params: { id: string } }
 
@@ -18,6 +18,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, task.projectId, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
   const body = await req.json()
   if (!body?.content) return Response.json({ error: 'content required' }, { status: 400 })
   const c = await prisma.comment.create({ data: { taskId: params.id, authorId: user.id, content: body.content } })

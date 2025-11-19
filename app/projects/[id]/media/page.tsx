@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id, AND: [projectWhere] } })
   if (!project) notFound()
   return project

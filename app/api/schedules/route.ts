@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { NextRequest } from 'next/server'
 
 export async function GET(req: NextRequest) {
@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: taskId, project: projectWhere }, include: { project: true } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  const canEdit = await ensureProjectPermission(user, task.projectId, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
 
   // Allow specifying a target user to schedule for (e.g., Bilal),
   // but only if that user is a member of the task's team.

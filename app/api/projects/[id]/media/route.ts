@@ -1,21 +1,23 @@
 import { NextRequest } from 'next/server'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { prisma } from '@/lib/prisma'
 import { getSupabaseAdmin, MEDIA_BUCKET, getPublicUrl, ensureBucketExists } from '@/lib/supabase'
 import { randomUUID } from 'crypto'
 
 type Ctx = { params: { id: string } }
 
-async function ensureProjectAccess(projectId: string) {
+async function ensureProjectAccess(projectId: string, level: 'READ' | 'EDIT') {
   const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: projectId, AND: [projectWhere] } })
   if (!project) return null
+  const allowed = await ensureProjectPermission(user, projectId, level)
+  if (!allowed) return null
   return { user, project }
 }
 
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const access = await ensureProjectAccess(params.id)
+  const access = await ensureProjectAccess(params.id, 'READ')
   if (!access) return Response.json({ error: 'Not found' }, { status: 404 })
 
   const supabase = getSupabaseAdmin()
@@ -59,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const access = await ensureProjectAccess(params.id)
+  const access = await ensureProjectAccess(params.id, 'EDIT')
   if (!access) return Response.json({ error: 'Not found' }, { status: 404 })
   const form = await req.formData().catch(() => null)
   if (!form) return Response.json({ error: 'Expected multipart form data' }, { status: 400 })
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
-  const access = await ensureProjectAccess(params.id)
+  const access = await ensureProjectAccess(params.id, 'EDIT')
   if (!access) return Response.json({ error: 'Not found' }, { status: 404 })
   const { searchParams } = new URL(req.url)
   const path = searchParams.get('path')

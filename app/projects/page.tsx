@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button'
 
 export const dynamic = 'force-dynamic'
 
-async function getProjects(query?: string) {
+async function getProjects(query?: string, archived = false) {
   const { user } = await requireUser()
   const scope = await projectScopeForUser(user.id)
-  const clauses: any[] = [buildProjectWhere(scope)]
+  const clauses: any[] = [buildProjectWhere(scope, { includeArchived: archived }), archived ? { archivedAt: { not: null } } : { archivedAt: null }]
   if (query && query.trim()) {
     clauses.push({
       OR: [
@@ -24,7 +24,10 @@ async function getProjects(query?: string) {
 
 export default async function ProjectsPage({ searchParams }: { searchParams?: { q?: string } }) {
   const q = (searchParams?.q || '').trim()
-  const projects = await getProjects(q)
+  const [projects, archived] = await Promise.all([
+    getProjects(q, false),
+    getProjects(q, true),
+  ])
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -43,24 +46,46 @@ export default async function ProjectsPage({ searchParams }: { searchParams?: { 
           <Link href="/dashboard" className="text-sm text-white/70 hover:text-white">Create via sidebar</Link>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {projects.map((p) => (
-          <Card key={p.id}>
-            <CardHeader className="font-semibold flex items-center justify-between">
-              <span>{p.name}</span>
-              <Link className="text-sm text-white/70 hover:text-white" href={`/projects/${p.id}`}>Open</Link>
-            </CardHeader>
-            <CardContent>
-              <div className="text-white/70 text-sm">{p.description || 'No description'}</div>
-            </CardContent>
-          </Card>
-        ))}
-        {projects.length === 0 && (
-          <div className="text-white/60">
-            {q ? 'No matching projects' : 'No projects yet. Use “Add Project” in the sidebar.'}
-          </div>
-        )}
-      </div>
+      <section className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map((p) => (
+            <Card key={p.id}>
+              <CardHeader className="font-semibold flex items-center justify-between">
+                <span>{p.name}</span>
+                <Link className="text-sm text-white/70 hover:text-white" href={`/projects/${p.id}`}>Open</Link>
+              </CardHeader>
+              <CardContent>
+                <div className="text-white/70 text-sm">{p.description || 'No description'}</div>
+              </CardContent>
+            </Card>
+          ))}
+          {projects.length === 0 && (
+            <div className="text-white/60">
+              {q ? 'No matching projects' : 'No projects yet. Use “Add Project” in the sidebar.'}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <div className="text-sm font-semibold">Archived</div>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {archived.map((p) => (
+            <Card key={p.id} className="border-dashed border-white/10 bg-white/[0.02]">
+              <CardHeader className="font-semibold flex items-center justify-between">
+                <span>{p.name}</span>
+                <Link className="text-sm text-white/70 hover:text-white" href={`/projects/${p.id}`}>Open</Link>
+              </CardHeader>
+              <CardContent>
+                <div className="text-white/70 text-sm">{p.description || 'No description'}</div>
+              </CardContent>
+            </Card>
+          ))}
+          {archived.length === 0 && (
+            <div className="text-white/50 text-sm">No archived projects</div>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

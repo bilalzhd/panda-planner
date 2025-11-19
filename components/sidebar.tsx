@@ -7,10 +7,11 @@ import { Dialog, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { PROJECT_COLOR_OPTIONS } from '@/lib/validators'
 
-type Project = { id: string; name: string; color?: string | null; isClient?: boolean }
+type Project = { id: string; name: string; color?: string | null }
 
 export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([])
+  const [archivedProjects, setArchivedProjects] = useState<Project[]>([])
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -18,29 +19,42 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
   const [color, setColor] = useState<string>('blue')
   const [loading, setLoading] = useState(false)
   const [navExpanded, setNavExpanded] = useState(false)
-  const [clientOnly, setClientOnly] = useState(false)
+  const [readOnlyMode, setReadOnlyMode] = useState(false)
+  const [canAccessUsers, setCanAccessUsers] = useState(false)
+  const [archivesOpen, setArchivesOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
   async function load() {
-    const res = await fetch('/api/projects?scope=1', { cache: 'no-store' })
+    const res = await fetch('/api/projects?scope=1&includeArchived=1', { cache: 'no-store' })
     if (!res.ok) return
     const data = await res.json()
     if (Array.isArray(data)) {
       setProjects(data)
-      setClientOnly(false)
+      setArchivedProjects([])
+      setReadOnlyMode(false)
+      setCanAccessUsers(false)
     } else {
       setProjects(Array.isArray(data?.projects) ? data.projects : [])
-      setClientOnly(!!data?.scope?.isClientOnly)
+      setArchivedProjects(Array.isArray(data?.archivedProjects) ? data.archivedProjects : [])
+      setReadOnlyMode(!data?.scope?.hasEditableProjects)
+      setCanAccessUsers(!!data?.scope?.canAccessUsers)
     }
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('projects:refresh', refresh)
+    return () => window.removeEventListener('projects:refresh', refresh)
+  }, [])
 
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ id: string; name: string }>).detail
       if (!detail || typeof detail.id !== 'string' || typeof detail.name !== 'string') return
       setProjects((prev) => prev.map((p) => (p.id === detail.id ? { ...p, name: detail.name } : p)))
+      setArchivedProjects((prev) => prev.map((p) => (p.id === detail.id ? { ...p, name: detail.name } : p)))
     }
     window.addEventListener('project:renamed', handler)
     return () => window.removeEventListener('project:renamed', handler)
@@ -62,7 +76,7 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
     setDescription('')
     setColor('blue')
     // Optimistically update and navigate
-    setProjects((prev) => [{ id: p.id, name: p.name, color: p.color, isClient: false }, ...prev])
+    setProjects((prev) => [{ id: p.id, name: p.name, color: p.color }, ...prev])
     router.push(`/projects/${p.id}`)
     // Also ensure list refreshed
     load()
@@ -72,11 +86,21 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
     return pathname === href
   }
 
+  const query = q.trim().toLowerCase()
+  const filteredProjects = query ? projects.filter((p) => p.name.toLowerCase().includes(query)) : projects
+  const filteredArchived = query ? archivedProjects.filter((p) => p.name.toLowerCase().includes(query)) : archivedProjects
+
+  useEffect(() => {
+    if (query && filteredArchived.length) {
+      setArchivesOpen(true)
+    }
+  }, [query, filteredArchived.length])
+
   const content = (
       <div className={`flex ${embedded ? 'h-screen' : 'h-[calc(100vh-56px)]'} flex-col gap-3 p-4 w-full`}>
         <div className={`${navExpanded ? 'max-h-none' : 'max-h-48'} overflow-auto pr-1 -mr-1`}>
         <nav className="flex flex-col gap-1">
-          {clientOnly ? (
+          {readOnlyMode ? (
             <SideLink href="/projects" active={isActive('/projects')} icon={iconProjects}>Projects</SideLink>
           ) : (
             <>
@@ -86,12 +110,12 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
               <SideLink href="/timesheets" active={isActive('/timesheets')} icon={iconTimesheets}>Timesheets</SideLink>
           <SideLink href="/credentials" active={isActive('/credentials')} icon={iconKey}>Credentials</SideLink>
           <SideLink href="/settings" active={isActive('/settings')} icon={iconGear}>Settings</SideLink>
-              <SideLink href="/team" active={isActive('/team')} icon={iconTeam}>Team</SideLink>
+              {canAccessUsers && <SideLink href="/users" active={isActive('/users')} icon={iconTeam}>Users</SideLink>}
             </>
           )}
         </nav>
         </div>
-        {!clientOnly && (
+        {!readOnlyMode && (
           <button
             type="button"
             className="self-start -mt-1 text-xs text-white/60 hover:text-white/80 px-1"
@@ -115,21 +139,55 @@ export function Sidebar({ embedded = false }: { embedded?: boolean }) {
           />
         </div>
         <div className="flex-1 min-h-32 overflow-auto">
-          <ul className="space-y-1">
-            {(q.trim() ? projects.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())) : projects).map((p) => {
-              const active = pathname?.startsWith(`/projects/${p.id}`)
-              return (
-                <li key={p.id}>
-                  <Link className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white/10 ${active ? 'bg-white/10' : ''}`} href={`/projects/${p.id}`}>
-                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colorToHex(p.color || 'gray') }} />
-                    {p.name}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="space-y-3">
+            <ul className="space-y-1">
+              {filteredProjects.map((p) => {
+                const active = pathname?.startsWith(`/projects/${p.id}`)
+                return (
+                  <li key={p.id}>
+                    <Link className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white/10 ${active ? 'bg-white/10' : ''}`} href={`/projects/${p.id}`}>
+                      <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colorToHex(p.color || 'gray') }} />
+                      {p.name}
+                    </Link>
+                  </li>
+                )
+              })}
+              {filteredProjects.length === 0 && (
+                <li className="text-sm text-white/60 px-2 py-1.5">No projects</li>
+              )}
+            </ul>
+
+            <div>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-1 text-[11px] uppercase tracking-wide text-white/60 hover:text-white"
+                onClick={() => setArchivesOpen((v) => !v)}
+              >
+                <span>Archives</span>
+                <span className={`transform transition-transform ${archivesOpen ? 'rotate-90' : ''}`}>&gt;</span>
+              </button>
+              {archivesOpen && (
+                <ul className="mt-1 space-y-1">
+                  {filteredArchived.map((p) => {
+                    const active = pathname?.startsWith(`/projects/${p.id}`)
+                    return (
+                      <li key={p.id}>
+                        <Link className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white/10 ${active ? 'bg-white/10' : ''}`} href={`/projects/${p.id}`}>
+                          <span className="inline-block h-2.5 w-2.5 rounded-full opacity-70" style={{ backgroundColor: colorToHex(p.color || 'gray') }} />
+                          <span className="opacity-80">{p.name}</span>
+                        </Link>
+                      </li>
+                    )
+                  })}
+                  {filteredArchived.length === 0 && (
+                    <li className="text-xs text-white/50 px-2 py-1.5">No archived projects</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
-        {!clientOnly && (
+        {!readOnlyMode && (
           <>
             <Button variant="outline" onClick={() => setOpen(true)}>Add Project</Button>
 

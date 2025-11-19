@@ -15,13 +15,13 @@ Changelog
   - Non‑completed tasks appear first; completed items are shown last under a “Completed” section.
 - Task page enhancement:
   - Added a status selector (To Do / In Progress / Done) to update task status directly from the task page.
-- Client access feature groundwork:
-  - Added project‑level client access and invite flow guarded by a feature flag `NEXT_PUBLIC_FEATURE_PROJECT_CLIENTS`.
-  - Sidebar and header adapt for client‑only users.
-- Invite UX:
-  - Added a dedicated accept page with a loading indicator during redirect.
+- Role-based access:
+  - Added a super admin role plus per-project read/edit assignments with centralized user management.
+  - Sidebar adapts when a user only has read-only projects.
+- Direct messaging:
+  - Replaced legacy team chat with recipient-scoped messages limited to shared projects or the super admin.
 - Email styling:
-  - Branded HTML templates for invite and task assignment emails with action buttons; improved text fallbacks.
+  - Branded HTML templates for task assignment and direct messages with action buttons; improved text fallbacks.
 
 
 v0.2.1 — 2025-09-15
@@ -69,6 +69,8 @@ Environment
   - `SUPABASE_MEDIA_SIGNED` (set `true` for private bucket)
   - `SUPABASE_SIGNED_URL_TTL` (signed URL lifetime in seconds)
   - `SUPABASE_SERVICE_ROLE_KEY` (server-side operations)
+- Workspaces: Set `WORKSPACE_FREE_LIMIT` to control how many workspaces a user can own on the free plan.
+  - Use the workspace switcher in the top navigation (for signed-in users) to view, switch, or create workspaces up to the allowed limit.
 
 
 For a full changelog, see the dedicated page at `/changelog` when running the app, or the CHANGELOG.md file in the repository.

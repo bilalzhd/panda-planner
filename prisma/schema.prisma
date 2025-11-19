@@ -54,10 +54,12 @@ model User {
   channelMessages ChannelMessage[]
   projectAccesses ProjectAccess[]
   notificationPref NotificationPreference?
+  permissions   UserPermission?
+  sentMessages  UserMessage[] @relation("MessagesSent")
+  receivedMessages UserMessage[] @relation("MessagesReceived")
 
   teamsOwned    Team[]      @relation("TeamOwner")
   memberships   Membership[]
-  invitesSent   TeamInvite[] @relation("InvitedBy")
   schedules     TaskSchedule[]
 
   accounts      Account[]
@@ -73,6 +75,8 @@ model Project {
   // Rich-text HTML notes for this project
   notesHtml   String?  @db.Text
   color       String?
+  // Soft-delete flag to hide projects without losing data
+  archivedAt  DateTime?
   health      ProjectHealth @default(ON_TRACK)
   healthAuto  Boolean       @default(true)
   team        Team     @relation(fields: [teamId], references: [id])
@@ -80,19 +84,20 @@ model Project {
   tasks       Task[]
   credentials Credential[]
   accesses    ProjectAccess[]
-  clientInvites TeamInvite[] @relation("ProjectInvites")
+  userMessages UserMessage[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
 model ProjectAccess {
-  id         String             @id @default(cuid())
-  project    Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId  String
-  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  role       ProjectAccessRole  @default(CLIENT)
-  createdAt  DateTime           @default(now())
+  id          String             @id @default(cuid())
+  project     Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  accessLevel ProjectAccessLevel @default(READ)
+  createdAt   DateTime           @default(now())
+  lastSeenAt  DateTime?
 
   @@unique([projectId, userId])
 }
@@ -199,17 +204,6 @@ enum TeamRole {
   MEMBER
 }
 
-enum InviteStatus {
-  PENDING
-  ACCEPTED
-  EXPIRED
-}
-
-enum InviteType {
-  TEAM_MEMBER
-  PROJECT_CLIENT
-}
-
 model Team {
   id        String       @id @default(cuid())
   name      String
@@ -217,7 +211,6 @@ model Team {
   ownerId   String
   projects  Project[]
   members   Membership[]
-  invites   TeamInvite[]
   messages  TeamMessage[]
   channels  TeamChannel[]
   createdAt DateTime     @default(now())
@@ -233,22 +226,6 @@ model Membership {
   role      TeamRole @default(MEMBER)
   createdAt DateTime @default(now())
   @@unique([teamId, userId])
-}
-
-model TeamInvite {
-  id          String        @id @default(cuid())
-  team        Team          @relation(fields: [teamId], references: [id])
-  teamId      String
-  project     Project?      @relation("ProjectInvites", fields: [projectId], references: [id])
-  projectId   String?
-  email       String
-  token       String        @unique
-  status      InviteStatus  @default(PENDING)
-  type        InviteType    @default(TEAM_MEMBER)
-  invitedBy   User          @relation("InvitedBy", fields: [invitedById], references: [id])
-  invitedById String
-  expiresAt   DateTime
-  createdAt   DateTime      @default(now())
 }
 
 // Lightweight team-wide message for async chat/requests
@@ -309,6 +286,34 @@ model ChannelMessage {
   updatedAt DateTime    @updatedAt
 }
 
+model UserPermission {
+  id              String   @id @default(cuid())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String   @unique
+  canAccessUsers  Boolean  @default(false)
+  canCreateUsers  Boolean  @default(false)
+  canEditUsers    Boolean  @default(false)
+  canDeleteUsers  Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model UserMessage {
+  id         String   @id @default(cuid())
+  sender     User     @relation("MessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId   String
+  receiver   User     @relation("MessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId String
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId  String?
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([receiverId, createdAt])
+  @@index([senderId, receiverId, createdAt])
+}
+
 // NextAuth required models
 model Account {
   id                String  @id @default(cuid())
@@ -352,9 +357,9 @@ enum ProjectHealth {
   OFF_TRACK
 }
 
-enum ProjectAccessRole {
-  CLIENT
-  COLLABORATOR
+enum ProjectAccessLevel {
+  READ
+  EDIT
 }
 
 model NotificationPreference {
@@ -362,7 +367,7 @@ model NotificationPreference {
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId             String   @unique
   emailTaskAssigned  Boolean  @default(true)
-  emailTeamMessage   Boolean  @default(false)
+  emailDirectMessage Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }

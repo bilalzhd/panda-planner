@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { timesheetSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
   const { user } = await requireUser()
@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: parsed.data.taskId, project: projectWhere } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  const canEdit = await ensureProjectPermission(user, task.projectId, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
   const { date, ...rest } = parsed.data
   const ts = await prisma.timesheet.create({ data: { ...rest, userId: rest.userId || user.id, date: new Date(date) } })
   return Response.json(ts, { status: 201 })

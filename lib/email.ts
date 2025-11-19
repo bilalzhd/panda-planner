@@ -73,51 +73,6 @@ export function getEmailConfigSummary() {
   }
 }
 
-export async function sendInviteEmail(to: string, acceptUrl: string, opts?: { projectName?: string }) {
-  const from = process.env.EMAIL_FROM || 'noreply@example.com'
-  const transporter = getTransport()
-  // Optional connectivity verification (fast no-op on many providers)
-  try { await transporter.verify() } catch {}
-  const projectName = opts?.projectName?.trim()
-  const brand = process.env.NEXT_PUBLIC_BRAND_NAME || 'Mera Kommunikation'
-  const subject = projectName
-    ? `You're invited to ${brand} · ${projectName}`
-    : `You're invited to ${brand}`
-  const introHtml = projectName
-    ? `You have been invited to view updates for the project <strong>${escapeHtml(projectName)}</strong>.`
-    : `You have been invited to join <strong>${escapeHtml(brand)}</strong>.`
-
-  const html = renderBrandedEmail({
-    title: 'Invitation',
-    preheader: projectName ? `Access the ${projectName} workspace` : `Access your ${brand} workspace`,
-    bodyHtml: `
-      <p>${introHtml}</p>
-      <p>Click the button below to accept the invite and get started.</p>
-    `,
-    action: { label: 'Accept Invite', url: acceptUrl },
-  })
-
-  const info = await transporter.sendMail({
-    from,
-    to,
-    subject,
-    text: `${stripHtml(introHtml)}\n\nAccept the invite: ${acceptUrl}\n\nIf you did not expect this email, you can ignore it.`,
-    html,
-  })
-  if (process.env.EMAIL_DEBUG === 'true') {
-    try {
-      console.log('[email] invite sent', {
-        to,
-        messageId: (info as any)?.messageId,
-        accepted: (info as any)?.accepted,
-        rejected: (info as any)?.rejected,
-        envelope: (info as any)?.envelope,
-      })
-    } catch {}
-  }
-  return info
-}
-
 export async function sendTaskAssignedEmail(args: {
   to: string
   task: { id: string; title: string; description?: string | null; project?: { name: string } | null; dueDate?: Date | null }
@@ -241,6 +196,96 @@ export async function sendTaskStatusChangedEmail(args: {
     } catch {}
   }
   return result
+}
+
+export async function sendDirectMessageEmail(args: {
+  to: string
+  recipientName?: string | null
+  sender: { name?: string | null; email?: string | null }
+  content: string
+  projectName?: string | null
+}) {
+  const { to, sender, content, projectName, recipientName } = args
+  if (!to) return
+  const transporter = getTransport()
+  try { await transporter.verify() } catch {}
+  const from = process.env.EMAIL_FROM || 'noreply@example.com'
+  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const inboxUrl = `${base}/messages`
+  const actor = sender.name || sender.email || 'A teammate'
+  const subject = projectName
+    ? `New message about ${projectName}`
+    : 'New message in PandaPlanner'
+  const intro = projectName
+    ? `${escapeHtml(actor)} sent you a message about <strong>${escapeHtml(projectName)}</strong>.`
+    : `${escapeHtml(actor)} sent you a new message.`
+  const html = renderBrandedEmail({
+    title: 'New Message',
+    preheader: stripHtml(intro),
+    bodyHtml: `
+      <p>${intro}</p>
+      <blockquote style="margin:12px 0;padding:12px 16px;border-left:3px solid #d1d5db;background:#f9fafb;color:#111827;font-style:italic">${escapeHtml(content)}</blockquote>
+      <p>Reply in PandaPlanner to keep the conversation going.</p>
+    `,
+    action: { label: 'Reply in App', url: inboxUrl },
+  })
+  const text = [
+    `${actor} sent you a message${projectName ? ` about ${projectName}` : ''}.`,
+    '',
+    content,
+    '',
+    `Reply: ${inboxUrl}`,
+  ].join('\n')
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  })
+}
+
+export async function sendWorkspaceInviteEmail(args: {
+  to: string
+  recipientName?: string | null
+  workspaceName: string
+  inviter: { name?: string | null; email?: string | null }
+  projects?: string[]
+}) {
+  const { to, recipientName, workspaceName, inviter, projects = [] } = args
+  if (!to) return
+  const transporter = getTransport()
+  try { await transporter.verify() } catch {}
+  const from = process.env.EMAIL_FROM || 'noreply@example.com'
+  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const subject = `You've been added to ${workspaceName}`
+  const preheader = `${inviter.name || inviter.email || 'A teammate'} invited you to collaborate`
+  const projectList = projects.length
+    ? `<p style="margin:12px 0 0 0"><strong>Projects:</strong> ${projects.map((p) => escapeHtml(p)).join(', ')}</p>`
+    : ''
+  const html = renderBrandedEmail({
+    title: 'Workspace Invitation',
+    preheader,
+    bodyHtml: `
+      <p>Hello ${escapeHtml(recipientName || '')},</p>
+      <p><strong>${escapeHtml(inviter.name || inviter.email || 'A teammate')}</strong> added you to the workspace <strong>${escapeHtml(workspaceName)}</strong>.</p>
+      ${projectList}
+      <p>Use the link below to sign in and start collaborating.</p>
+    `,
+    action: { label: 'Open PandaPlanner', url: base || 'https://app.pandaplanner.dev' },
+  })
+  const textLines = [
+    `${inviter.name || inviter.email || 'A teammate'} added you to the workspace "${workspaceName}".`,
+    projects.length ? `Projects: ${projects.join(', ')}` : undefined,
+    `Open: ${base || 'https://app.pandaplanner.dev'}`,
+  ].filter(Boolean) as string[]
+  await transporter.sendMail({
+    from,
+    to,
+    subject,
+    text: textLines.join('\n'),
+    html,
+  })
 }
 
 export async function sendTaskDueReminderEmail(args: {

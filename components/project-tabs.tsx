@@ -1,5 +1,5 @@
 "use client"
-import { useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Tabs } from '@/components/ui/tabs'
 import { ProjectBoard } from '@/components/project-board'
 import { ProjectMedia } from '@/components/project-media'
@@ -7,8 +7,7 @@ import { ProjectNotes } from '@/components/project-notes'
 import { CredentialsPanel } from '@/components/credentials-panel'
 import { TaskList } from '@/components/task-list'
 import { InlineEdit } from '@/components/inline-edit'
-import { ProjectClientsPanel } from '@/components/project-clients'
-import { FEATURE_PROJECT_CLIENTS } from '@/lib/flags'
+// Client invite tabs removed; permissions handled via accessLevel prop.
 
 type UserLite = { id: string; name: string | null; email: string | null; image: string | null }
 type TaskLite = {
@@ -23,13 +22,29 @@ type TaskLite = {
   timesheets?: { hours: any }[]
 }
 
-export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { projectId: string; tasks: TaskLite[]; overdue: TaskLite[]; canManageClients: boolean }) {
-  const [active, setActive] = useState('board')
+type ProjectTabsProps = {
+  projectId: string
+  tasks: TaskLite[]
+  overdue: TaskLite[]
+  accessLevel: 'READ' | 'EDIT'
+  initialTab?: string
+  isArchived?: boolean
+}
+
+export function ProjectTabs({
+  projectId,
+  tasks,
+  overdue,
+  accessLevel,
+  initialTab,
+  isArchived = false,
+}: ProjectTabsProps) {
+  const [active, setActive] = useState(initialTab || 'board')
   const [description, setDescription] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [healthAuto, setHealthAuto] = useState(true)
   const [health, setHealth] = useState<'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK'>(() => computeHealth(tasks))
-  const [hasClients, setHasClients] = useState(false)
+  const canEdit = accessLevel === 'EDIT'
 
   // On mount, fetch minimal project info for description + health
   // Using GET on the page already loaded data would be nicer, but we keep it minimal.
@@ -43,26 +58,31 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
           setDescription(p.description || '')
           if (p.health) setHealth(p.health)
           if (typeof p.healthAuto === 'boolean') setHealthAuto(p.healthAuto)
-          if (typeof p.hasClients === 'boolean') setHasClients(!!p.hasClients)
         }
       } catch {}
     })()
   }
 
+  const tabs = useMemo(() => ([
+    { key: 'overview', label: 'Overview', icon: iconOverview },
+    { key: 'list', label: 'List', icon: iconList },
+    { key: 'board', label: 'Board', icon: iconBoard },
+    ...(canEdit ? [{ key: 'files', label: 'Files', icon: iconFiles }] : []),
+    { key: 'notes', label: 'Notes', icon: iconNotes },
+    ...(canEdit ? [{ key: 'credentials', label: 'Credentials', icon: iconKey }] : []),
+  ]), [canEdit])
+  const availableKeys = useMemo(() => tabs.map((t) => t.key), [tabs])
+  useEffect(() => {
+    if (!availableKeys.includes(active)) {
+      const fallback = availableKeys.includes('board') ? 'board' : availableKeys[0]
+      if (fallback && fallback !== active) setActive(fallback)
+    }
+  }, [availableKeys, active])
+
   return (
     <div className="mt-2">
       <Tabs
-        tabs={[
-          { key: 'overview', label: 'Overview', icon: iconOverview },
-          { key: 'list', label: 'List', icon: iconList },
-          { key: 'board', label: 'Board', icon: iconBoard },
-          ...(canManageClients ? [{ key: 'files', label: 'Files', icon: iconFiles }] : []),
-          { key: 'notes', label: 'Notes', icon: iconNotes },
-          ...(canManageClients ? [{ key: 'credentials', label: 'Credentials', icon: iconKey }] : []),
-          ...(canManageClients && FEATURE_PROJECT_CLIENTS
-            ? [{ key: 'clients', label: 'Clients', icon: iconClients }]
-            : []),
-        ]}
+        tabs={tabs}
         initial={active}
         onChange={setActive}
       />
@@ -73,7 +93,7 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
             <div className="md:col-span-2">
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
                 <div className="mb-2 text-sm font-semibold">Description</div>
-                {canManageClients ? (
+                {canEdit && !isArchived ? (
                   <InlineEdit
                     value={description || ''}
                     placeholder="Click to add a short project description..."
@@ -171,8 +191,8 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
           <ProjectBoard
             projectId={projectId}
             initialTasks={tasks as any}
-            readOnly={!canManageClients}
-            showClientLane={FEATURE_PROJECT_CLIENTS && (!!hasClients || !canManageClients)}
+            readOnly={!canEdit || isArchived}
+            showClientLane={false}
           />
         </div>
       )}
@@ -192,12 +212,6 @@ export function ProjectTabs({ projectId, tasks, overdue, canManageClients }: { p
       {active === 'credentials' && (
         <div className="py-4">
           <CredentialsPanel projectId={projectId} />
-        </div>
-      )}
-
-      {active === 'clients' && canManageClients && FEATURE_PROJECT_CLIENTS && (
-        <div className="py-4">
-          <ProjectClientsPanel projectId={projectId} />
         </div>
       )}
     </div>
@@ -278,13 +292,5 @@ const iconKey = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="8" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/>
     <path d="M11 12h9M17 12v4M20 12v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-)
-
-const iconClients = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M7.5 12a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Zm9 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M1.75 20c.87-2.92 3.74-5 7.25-5 1.1 0 2.15.19 3.11.53" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-    <path d="M14.5 16.5 18 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 )

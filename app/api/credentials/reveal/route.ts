@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, projectScopeForUser } from '@/lib/tenant'
 import { decryptSecret, hashPin, verifyPin } from '@/lib/crypto'
 
 export async function POST(req: NextRequest) {
@@ -20,13 +20,18 @@ export async function POST(req: NextRequest) {
   }
 
   const projectWhere = await projectWhereForUser(user.id)
+  const scope = await projectScopeForUser(user.id)
   const projects = await prisma.project.findMany({
     where: projectWhere,
     include: { credentials: true },
     orderBy: { createdAt: 'desc' },
   })
+  const editableProjects = scope.isSuperAdmin
+    ? new Set(projects.map((p) => p.id))
+    : new Set(Object.entries(scope.accessMap).filter(([, level]) => level === 'EDIT').map(([projectId]) => projectId))
+  const filtered = projects.filter((p) => editableProjects.has(p.id))
 
-  const result = projects.map((p) => ({
+  const result = filtered.map((p) => ({
     projectId: p.id,
     projectName: p.name,
     credentials: p.credentials.map((c) => ({ id: c.id, label: c.label, username: c.username, password: safeDecrypt(c.secretEnc) })),

@@ -19,21 +19,21 @@ function NotificationsCard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [emailTaskAssigned, setEmailTaskAssigned] = useState(true)
-  const [emailTeamMessage, setEmailTeamMessage] = useState(false)
+  const [emailDirectMessage, setEmailDirectMessage] = useState(true)
   const [msg, setMsg] = useState('')
   const [note, setNote] = useState('')
 
   useEffect(() => {
     fetch('/api/settings/notifications')
       .then((r) => r.json())
-      .then((j) => { setEmailTaskAssigned(!!j.emailTaskAssigned); setEmailTeamMessage(!!j.emailTeamMessage); if (j.setupPending) setNote('Notifications are being set up. You can still toggle your preference and try saving again shortly.') })
+      .then((j) => { setEmailTaskAssigned(!!j.emailTaskAssigned); setEmailDirectMessage(!!j.emailDirectMessage); if (j.setupPending) setNote('Notifications are being set up. You can still toggle your preference and try saving again shortly.') })
       .finally(() => setLoading(false))
   }, [])
 
   async function save() {
     setSaving(true)
     setMsg('')
-    const res = await fetch('/api/settings/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailTaskAssigned, emailTeamMessage }) })
+    const res = await fetch('/api/settings/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailTaskAssigned, emailDirectMessage }) })
     setSaving(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
@@ -52,7 +52,7 @@ function NotificationsCard() {
       ) : (
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailTaskAssigned} onChange={(e) => setEmailTaskAssigned(e.target.checked)} /> Email me when tasks are assigned to me</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailTeamMessage} onChange={(e) => setEmailTeamMessage(e.target.checked)} /> Email me when new team messages are posted</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailDirectMessage} onChange={(e) => setEmailDirectMessage(e.target.checked)} /> Email me when I receive direct messages</label>
           <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
           {note && <div className="text-xs text-white/60">{note}</div>}
           {msg && <div className={`text-xs ${msg.startsWith('Your') ? 'text-emerald-400' : 'text-rose-400'}`}>{msg}</div>}

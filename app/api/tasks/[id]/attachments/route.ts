@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 
 export const runtime = 'nodejs'
 
@@ -22,6 +22,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
+  const canEdit = await ensureProjectPermission(user, task.projectId, 'EDIT')
+  if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
   const form = await req.formData()
   const file = form.get('file') as unknown as File
   if (!file) return Response.json({ error: 'file required' }, { status: 400 })

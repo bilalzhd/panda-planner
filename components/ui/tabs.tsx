@@ -17,6 +17,11 @@ export function Tabs({ tabs, initial, onChange }: { tabs: Tab[]; initial?: strin
   const id = useId()
 
   useEffect(() => {
+    const next = (initial && tabs.find((t) => t.key === initial && !t.disabled)?.key) || tabs.find((t) => !t.disabled)?.key || tabs[0]?.key
+    if (next && next !== active) setActive(next)
+  }, [initial, tabs, active])
+
+  useEffect(() => {
     onChange?.(active)
   }, [active])
 
