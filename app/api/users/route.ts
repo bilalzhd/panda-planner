@@ -1,17 +1,15 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser } from '@/lib/tenant'
 
 export async function GET() {
-  const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  // Users who share at least one team with the requester
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) return Response.json([])
   const users = await prisma.user.findMany({
     where: {
-      memberships: { some: { teamId: { in: teamIds } } },
+      memberships: { some: { teamId: workspaceId } },
     },
     select: { id: true, name: true, email: true, image: true },
     orderBy: [{ name: 'asc' }, { email: 'asc' }],
   })
   return Response.json(users)
 }
-

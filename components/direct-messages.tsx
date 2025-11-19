@@ -116,7 +116,7 @@ export function DirectMessages({
       <aside className="rounded-lg border border-white/10 bg-white/[0.02]">
         <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
           <div className="text-sm font-semibold">Recipients</div>
-          <Button variant="ghost" size="sm" onClick={refreshRecipients}>Refresh</Button>
+          <Button variant="ghost" onClick={refreshRecipients}>Refresh</Button>
         </div>
         <ul className="max-h-[60vh] overflow-auto">
           {recipients.length === 0 && (
@@ -186,7 +186,7 @@ export function DirectMessages({
             />
             <div className="flex items-center justify-between text-xs text-white/50">
               <span>{selectedRecipient ? 'Messages are visible to both participants.' : 'Pick someone to begin.'}</span>
-              <Button size="sm" onClick={sendMessage} disabled={!selectedRecipient || !text.trim() || loading}>
+              <Button onClick={sendMessage} disabled={!selectedRecipient || !text.trim() || loading}>
                 {loading ? 'Sending…' : 'Send'}
               </Button>
             </div>

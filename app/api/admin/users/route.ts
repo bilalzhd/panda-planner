@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, getUserCapability, getWorkspaceContext, isSuperAdmin } from '@/lib/tenant'
+import { requireUser, getUserCapability } from '@/lib/tenant'
 import { sendWorkspaceInviteEmail } from '@/lib/email'
 
 type AccessInput = { projectId: string; accessLevel: 'READ' | 'EDIT' }
@@ -10,12 +10,11 @@ function normalizeEmail(email: string) {
 }
 
 export async function GET() {
-  const { user } = await requireUser()
-  const capability = await getUserCapability(user.id)
+  const { user, workspaceId, workspace } = await requireUser()
+  const capability = await getUserCapability(user.id, workspaceId)
   if (!capability.canAccessUsers) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
-  const { workspaceId } = await getWorkspaceContext(user.id, capability.isSuperAdmin)
   if (!workspaceId) {
     return Response.json({ users: [], projects: [], capability })
   }
@@ -43,7 +42,7 @@ export async function GET() {
       id: u.id,
       name: u.name,
       email: u.email,
-      isSuperAdmin: isSuperAdmin(u),
+      isSuperAdmin: workspace?.ownerId === u.id,
       accesses: u.projectAccesses.map((p) => ({
         projectId: p.projectId,
         projectName: p.project?.name,
@@ -65,12 +64,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { user } = await requireUser()
-  const capability = await getUserCapability(user.id)
+  const { user, workspaceId, workspace } = await requireUser()
+  const capability = await getUserCapability(user.id, workspaceId)
   if (!capability.canCreateUsers) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
-  const { workspaceId } = await getWorkspaceContext(user.id, capability.isSuperAdmin)
   if (!workspaceId) {
     return Response.json({ error: 'Select a workspace first' }, { status: 400 })
   }
@@ -125,7 +123,6 @@ export async function POST(req: NextRequest) {
     },
   })
   if (created.email) {
-    const workspace = await prisma.team.findUnique({ where: { id: workspaceId }, select: { name: true } })
     const assignedNames = cleanedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
     try {
       await sendWorkspaceInviteEmail({

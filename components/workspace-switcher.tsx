@@ -1,26 +1,15 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-
-type Workspace = { id: string; name: string; ownerId: string }
+import { useWorkspace } from '@/components/workspace-provider'
 
 export function WorkspaceSwitcher() {
-  const router = useRouter()
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [limit, setLimit] = useState<number | null>(null)
-  const [activeId, setActiveId] = useState('')
-  const [loading, setLoading] = useState(true)
+  const { workspaces, limit, activeWorkspaceId, loading, error: loadError, creating, selecting, refresh, selectWorkspace, createWorkspace } = useWorkspace()
   const [open, setOpen] = useState(false)
-  const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    loadWorkspaces()
-  }, [])
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -40,51 +29,19 @@ export function WorkspaceSwitcher() {
     }
   }, [open])
 
-  async function loadWorkspaces() {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/workspaces', { cache: 'no-store' })
-      if (!res.ok) throw new Error('Failed to load workspaces')
-      const data = await res.json()
-      const list = Array.isArray(data?.workspaces) ? data.workspaces : []
-      setWorkspaces(list)
-      if (typeof data?.limit === 'number') setLimit(data.limit)
-      const active = typeof data?.activeWorkspaceId === 'string' ? data.activeWorkspaceId : (list[0]?.id || '')
-      setActiveId(active || '')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load workspaces')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const reachedLimit = useMemo(() => {
     if (limit == null) return false
     return workspaces.length >= limit
   }, [limit, workspaces])
 
-  async function createWorkspace() {
+  async function handleCreateWorkspace() {
     if (!newName.trim() || creating || reachedLimit) return
-    setCreating(true)
     setError(null)
     try {
-      const res = await fetch('/api/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Could not create workspace')
-      }
+      await createWorkspace(newName.trim())
       setNewName('')
-      await loadWorkspaces()
-      router.refresh()
     } catch (e: any) {
       setError(e?.message || 'Could not create workspace')
-    } finally {
-      setCreating(false)
     }
   }
 
@@ -95,38 +52,26 @@ export function WorkspaceSwitcher() {
   if (workspaces.length === 0) {
     return (
       <div className="flex items-center gap-2 text-xs text-white/70">
-        <Button size="sm" variant="ghost" onClick={createWorkspace} disabled={creating}>
+        <Button variant="ghost" onClick={handleCreateWorkspace} disabled={creating || reachedLimit}>
           {creating ? 'Creating…' : 'Create workspace'}
         </Button>
-        {error && <span className="text-rose-300">{error}</span>}
+        {(error || loadError) && <span className="text-rose-300">{error || loadError}</span>}
       </div>
     )
   }
 
+  const activeId = activeWorkspaceId || workspaces[0]?.id || ''
   const activeWorkspace = workspaces.find((w) => w.id === activeId) || workspaces[0]
 
-  async function selectWorkspace(workspaceId: string) {
-    if (workspaceId === activeId) {
+  async function handleSelectWorkspace(workspaceId: string) {
+    if (!workspaceId || workspaceId === activeId || selecting) {
       setOpen(false)
       return
     }
     setError(null)
     try {
-      const res = await fetch('/api/workspaces/select', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Unable to switch workspace')
-      }
-      setActiveId(workspaceId)
+      await selectWorkspace(workspaceId)
       setOpen(false)
-      router.refresh()
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('workspace:changed', { detail: { workspaceId } }))
-      }
     } catch (e: any) {
       setError(e?.message || 'Unable to switch workspace')
     }
@@ -142,7 +87,7 @@ export function WorkspaceSwitcher() {
         {activeWorkspace?.name || 'Workspace'}
         <ChevronDownIcon className="ml-2 h-4 w-4 opacity-70" />
       </button>
-      <Button variant="ghost" className="h-8 w-8 p-0" onClick={() => loadWorkspaces()} title="Refresh workspaces">
+      <Button variant="ghost" className="h-8 w-8 p-0" onClick={refresh} title="Refresh workspaces">
         ⟳
       </Button>
       {open && (
@@ -153,10 +98,8 @@ export function WorkspaceSwitcher() {
               <button
                 key={workspace.id}
                 type="button"
-                onClick={() => selectWorkspace(workspace.id)}
-                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${
-                  workspace.id === activeId ? 'bg-white/15 text-white' : 'hover:bg-white/10'
-                }`}
+                onClick={() => handleSelectWorkspace(workspace.id)}
+                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm ${workspace.id === activeId ? 'bg-white/15 text-white' : 'hover:bg-white/10'}`}
               >
                 <span className="truncate">{workspace.name}</span>
                 {workspace.id === activeId && <span className="text-[10px] uppercase tracking-wide text-white/70">Active</span>}
@@ -170,11 +113,7 @@ export function WorkspaceSwitcher() {
               onChange={(e) => setNewName(e.target.value)}
               disabled={reachedLimit || creating}
             />
-            <Button
-              className="w-full"
-              onClick={createWorkspace}
-              disabled={reachedLimit || creating || !newName.trim()}
-            >
+            <Button className="w-full" onClick={handleCreateWorkspace} disabled={reachedLimit || creating || !newName.trim()}>
               {creating ? 'Adding…' : 'Add workspace'}
             </Button>
             {typeof limit === 'number' && (
@@ -182,7 +121,7 @@ export function WorkspaceSwitcher() {
                 {workspaces.length}/{limit} workspaces used
               </div>
             )}
-            {error && <div className="text-[11px] text-rose-300 text-center">{error}</div>}
+            {(error || loadError) && <div className="text-[11px] text-rose-300 text-center">{error || loadError}</div>}
           </div>
         </div>
       )}

@@ -4,11 +4,11 @@ import { NextRequest } from 'next/server'
 import { requireUser, projectWhereForUser, projectScopeForUser, getUserCapability } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const { user } = await requireUser()
-  const scope = await projectScopeForUser(user.id)
+  const { user, workspaceId } = await requireUser()
+  const scope = await projectScopeForUser(user.id, workspaceId)
   const params = new URL(req.url).searchParams
   const includeArchived = params.has('includeArchived')
-  const projectWhere = await projectWhereForUser(user.id, { includeArchived })
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived, workspaceId })
   const activeWhere = includeArchived ? { AND: [projectWhere, { archivedAt: null }] } : projectWhere
   const [projects, archived] = await Promise.all([
     prisma.project.findMany({
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     })
   }
   if (includeScope) {
-    const capability = await getUserCapability(user.id)
+    const capability = await getUserCapability(user.id, workspaceId)
     const hasEditableProjects = scope.isSuperAdmin || enriched.some((p) => p.accessLevel === 'EDIT')
     payload.scope = {
       hasEditableProjects,
@@ -53,22 +53,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = projectSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
-  const { user, personalTeam } = await requireUser()
-
-  // If teamId supplied, use it after verifying membership
-  let teamId = (body?.teamId as string) || ''
-  if (teamId) {
-    const membership = await prisma.membership.findFirst({ where: { teamId, userId: user.id } })
-    if (!membership) return Response.json({ error: 'Forbidden' }, { status: 403 })
-  } else {
-    // Choose a sensible default team: pick the team the user belongs to
-    // with the most members (shared team), else fall back to personal team.
-    const teams = await prisma.team.findMany({
-      where: { members: { some: { userId: user.id } } },
-      include: { _count: { select: { members: true } } },
-    })
-    const best = teams.sort((a, b) => b._count.members - a._count.members)[0]
-    teamId = best?.id || personalTeam.id
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
+  const teamId = workspaceId
+  if (body?.teamId && body.teamId !== workspaceId) {
+    return Response.json({ error: 'Projects can only be created in the active workspace' }, { status: 400 })
   }
 
   const project = await prisma.project.create({ data: { ...parsed.data, teamId } })

@@ -4,7 +4,10 @@ import PDFDocument from 'pdfkit'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const format = (searchParams.get('format') || 'csv').toLowerCase()

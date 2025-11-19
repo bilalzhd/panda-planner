@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser } from '@/lib/tenant'
 import Link from 'next/link'
 import { expandSchedules } from '@/lib/schedule'
 import { TeamScheduleDialog } from '@/components/team-schedule-dialog'
@@ -9,11 +9,11 @@ export const dynamic = 'force-dynamic'
 function startOfDay(d: Date) { const x = new Date(d); x.setHours(0,0,0,0); return x }
 
 export default async function TodosPage() {
-  const { user } = await requireUser()
-  const teamIds = await teamIdsForUser(user.id)
-  if (teamIds.length === 0) return <div>No team found.</div>
-  // Use the first/most recent team for now
-  const teamId = teamIds[0]
+  const { user, workspaceId, workspace } = await requireUser()
+  if (!workspaceId) {
+    return <div className="text-sm text-white/70">Select a workspace to view team todos.</div>
+  }
+  const teamId = workspaceId
 
   const today = startOfDay(new Date())
 

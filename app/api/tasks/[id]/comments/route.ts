@@ -5,7 +5,10 @@ import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib
 type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -14,7 +17,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!task) return Response.json({ error: 'Not found' }, { status: 404 })

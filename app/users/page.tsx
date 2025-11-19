@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function UsersPage() {
   const { user, workspaceId } = await requireUser()
-  const capability = await getUserCapability(user.id)
+  const capability = await getUserCapability(user.id, workspaceId)
   if (!capability.canAccessUsers || !workspaceId) {
     notFound()
   }

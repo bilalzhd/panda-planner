@@ -6,7 +6,10 @@ import { encryptSecret } from '@/lib/crypto'
 
 // List credentials for a project (masked)
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -19,7 +22,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 // Create a credential for a project
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: params.id, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Not found' }, { status: 404 })

@@ -1,77 +1,68 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, isSuperAdmin } from '@/lib/tenant'
+import { requireUser } from '@/lib/tenant'
 
 export async function GET() {
-  const { user } = await requireUser()
-  const currentIsSuper = isSuperAdmin(user)
-  let recipients: {
-    id: string
-    name: string | null
-    email: string | null
-    sharedProjects: string[]
-    isSuperAdmin: boolean
-  }[] = []
-
+  const { user, workspaceId, workspace } = await requireUser()
+  if (!workspaceId || !workspace) {
+    return Response.json({ recipients: [] })
+  }
+  const workspaceOwnerId = workspace.ownerId
+  const currentIsSuper = workspaceOwnerId === user.id
+  let myProjectIds: string[] = []
   if (currentIsSuper) {
-    const others = await prisma.user.findMany({
-      where: { id: { not: user.id } },
-      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    const projects = await prisma.project.findMany({
+      where: { teamId: workspaceId },
+      select: { id: true },
     })
-    recipients = others.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      sharedProjects: [],
-      isSuperAdmin: isSuperAdmin(u),
-    }))
+    myProjectIds = projects.map((p) => p.id)
   } else {
     const myProjects = await prisma.projectAccess.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, project: { teamId: workspaceId } },
       select: { projectId: true },
     })
-    const projectIds = myProjects.map((p) => p.projectId)
-    if (projectIds.length > 0) {
-      const others = await prisma.user.findMany({
-        where: {
-          id: { not: user.id },
-          projectAccesses: { some: { projectId: { in: projectIds } } },
-        },
+    myProjectIds = myProjects.map((p) => p.projectId)
+  }
+
+  const memberships = await prisma.membership.findMany({
+    where: { teamId: workspaceId, userId: { not: user.id } },
+    include: {
+      user: {
         include: {
           projectAccesses: {
-            where: { projectId: { in: projectIds } },
+            where: { project: { teamId: workspaceId } },
             include: { project: { select: { name: true } } },
           },
         },
-        orderBy: [{ name: 'asc' }, { email: 'asc' }],
-      })
-      recipients = others.map((u) => ({
+      },
+      team: { select: { ownerId: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  const recipients = memberships
+    .map((member) => {
+      const u = member.user
+      const sharedProjects = currentIsSuper
+        ? u.projectAccesses.map((pa) => pa.project?.name || '').filter((n): n is string => !!n)
+        : u.projectAccesses
+            .filter((pa) => myProjectIds.includes(pa.projectId))
+            .map((pa) => pa.project?.name || '')
+            .filter((n): n is string => !!n)
+      const recipientIsSuper = member.team?.ownerId === u.id
+      return {
         id: u.id,
         name: u.name,
         email: u.email,
-        sharedProjects: u.projectAccesses
-          .map((pa) => pa.project?.name)
-          .filter((n): n is string => !!n),
-        isSuperAdmin: isSuperAdmin(u),
-      }))
-    }
-  }
-
-  const adminEmail = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase()
-  if (!currentIsSuper && adminEmail) {
-    const adminUser = await prisma.user.findFirst({ where: { email: adminEmail } })
-    if (adminUser && adminUser.id !== user.id) {
-      const exists = recipients.some((r) => r.id === adminUser.id)
-      if (!exists) {
-        recipients.unshift({
-          id: adminUser.id,
-          name: adminUser.name,
-          email: adminUser.email,
-          sharedProjects: [],
-          isSuperAdmin: true,
-        })
+        sharedProjects,
+        isSuperAdmin: recipientIsSuper,
       }
-    }
-  }
+    })
+    .filter((recipient) => currentIsSuper || recipient.isSuperAdmin || recipient.sharedProjects.length > 0)
+    .sort((a, b) => {
+      const aName = a.name || a.email || ''
+      const bName = b.name || b.email || ''
+      return aName.localeCompare(bName)
+    })
 
   return Response.json({ recipients })
 }

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, teamIdsForUser } from '@/lib/tenant'
+import { requireUser } from '@/lib/tenant'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { RemoveMemberButton } from '@/components/remove-member-button'
@@ -7,24 +7,13 @@ import { Button } from '@/components/ui/button'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TeamPage({ searchParams }: { searchParams: { teamId?: string; accepted?: string } }) {
-  const { user } = await requireUser()
-  const memberships = await prisma.membership.findMany({
-    where: { userId: user.id },
-    include: { team: true },
-    orderBy: { createdAt: 'desc' },
-  })
-  if (memberships.length === 0) {
-    return <div>No teams yet.</div>
+export default async function TeamPage() {
+  const { user, workspaceId, workspace } = await requireUser()
+  if (!workspaceId || !workspace) {
+    return <div className="text-sm text-white/70">Select a workspace to view team members.</div>
   }
-
-  const requestedTeamId = searchParams.teamId
-  const allowedTeamIds = new Set(memberships.map((m) => m.teamId))
-  const currentTeamId = requestedTeamId && allowedTeamIds.has(requestedTeamId)
-    ? requestedTeamId
-    : memberships[0].teamId // default to most recent membership (likely the invited team)
-
-  const currentTeam = memberships.find((m) => m.teamId === currentTeamId)!.team
+  const currentTeamId = workspaceId
+  const currentTeam = workspace
 
   const members = await prisma.membership.findMany({
     where: { teamId: currentTeamId },
@@ -43,17 +32,11 @@ export default async function TeamPage({ searchParams }: { searchParams: { teamI
         <div className="text-sm text-white/80">Current team: <span className="font-medium">{currentTeam.name}</span></div>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        {memberships.map((m) => (
-          <Link key={m.teamId} href={`/team?teamId=${m.teamId}`} className={`rounded-md border px-2 py-1 ${m.teamId === currentTeamId ? 'border-white bg-white text-black' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>{m.team.name}</Link>
-        ))}
-      </div>
-
       <Card>
         <CardHeader className="font-semibold">Manage access</CardHeader>
         <CardContent className="space-y-2 text-sm text-white/70">
           <p>Invitations have moved to the new Users screen where you can grant project access and user-management permissions.</p>
-          <Button asChild variant="outline" className="text-sm">
+          <Button variant="outline" className="text-sm">
             <Link href="/users">Open Users</Link>
           </Button>
         </CardContent>

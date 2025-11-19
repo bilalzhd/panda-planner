@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, getUserCapability, isSuperAdmin } from '@/lib/tenant'
+import { requireUser, getUserCapability } from '@/lib/tenant'
 
 type AccessInput = { projectId: string; accessLevel: 'READ' | 'EDIT' }
 
@@ -9,15 +9,26 @@ function normalizeEmail(email: string) {
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const { user } = await requireUser()
-  const capability = await getUserCapability(user.id)
+  const { user, workspaceId } = await requireUser()
+  const capability = await getUserCapability(user.id, workspaceId)
   if (!capability.canEditUsers) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
-  const target = await prisma.user.findUnique({ where: { id: params.id }, include: { projectAccesses: true } })
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
+  const target = await prisma.user.findUnique({ where: { id: params.id }, include: { permissions: true } })
   if (!target) return Response.json({ error: 'Not found' }, { status: 404 })
-  if (isSuperAdmin(target) && !capability.isSuperAdmin) {
-    return Response.json({ error: 'Cannot modify super admin' }, { status: 403 })
+  const membership = await prisma.membership.findFirst({
+    where: { teamId: workspaceId, userId: target.id },
+    include: { team: { select: { ownerId: true } } },
+  })
+  if (!membership) {
+    return Response.json({ error: 'Not found' }, { status: 404 })
+  }
+  const targetIsOwner = membership.team?.ownerId === target.id
+  if (targetIsOwner && !capability.isSuperAdmin) {
+    return Response.json({ error: 'Cannot modify workspace owner' }, { status: 403 })
   }
   const body = await req.json().catch(() => ({}))
   const updates: any = {}
@@ -34,13 +45,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await prisma.user.update({ where: { id: target.id }, data: updates })
   }
   const accesses = Array.isArray(body?.projectAccesses) ? (body.projectAccesses as AccessInput[]) : []
-  await prisma.projectAccess.deleteMany({ where: { userId: target.id } })
-  if (isSuperAdmin(target)) {
-    // super admin gets implicit edit access; no direct records needed
+  await prisma.projectAccess.deleteMany({
+    where: { userId: target.id, project: { teamId: workspaceId } },
+  })
+  if (targetIsOwner) {
+    // owners have implicit edit access to all projects
   } else if (accesses.length) {
+    const allowedProjects = await prisma.project.findMany({
+      where: { teamId: workspaceId },
+      select: { id: true },
+    })
+    const allowed = new Set(allowedProjects.map((p) => p.id))
     await prisma.projectAccess.createMany({
       data: accesses
-        .filter((a) => typeof a?.projectId === 'string' && (a.accessLevel === 'READ' || a.accessLevel === 'EDIT'))
+        .filter(
+          (a) =>
+            typeof a?.projectId === 'string' &&
+            allowed.has(a.projectId) &&
+            (a.accessLevel === 'READ' || a.accessLevel === 'EDIT'),
+        )
         .map((a) => ({ projectId: a.projectId, userId: target.id, accessLevel: a.accessLevel })),
     })
   }
@@ -67,18 +90,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const { user } = await requireUser()
-  const capability = await getUserCapability(user.id)
+  const { user, workspaceId } = await requireUser()
+  const capability = await getUserCapability(user.id, workspaceId)
   if (!capability.canDeleteUsers) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
   if (user.id === params.id) return Response.json({ error: 'Cannot delete your own account' }, { status: 400 })
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const target = await prisma.user.findUnique({ where: { id: params.id } })
   if (!target) return Response.json({ error: 'Not found' }, { status: 404 })
-  if (isSuperAdmin(target)) {
-    return Response.json({ error: 'Cannot delete super admin' }, { status: 403 })
+  const membership = await prisma.membership.findFirst({
+    where: { teamId: workspaceId, userId: target.id },
+    include: { team: { select: { ownerId: true } } },
+  })
+  if (!membership) {
+    return Response.json({ error: 'Not found' }, { status: 404 })
   }
-  await prisma.projectAccess.deleteMany({ where: { userId: target.id } })
+  const targetIsOwner = membership.team?.ownerId === target.id
+  if (targetIsOwner) {
+    return Response.json({ error: 'Cannot delete workspace owner' }, { status: 403 })
+  }
+  await prisma.projectAccess.deleteMany({ where: { userId: target.id, project: { teamId: workspaceId } } })
   await prisma.userPermission.deleteMany({ where: { userId: target.id } })
   await prisma.user.delete({ where: { id: target.id } })
   return new Response(null, { status: 204 })

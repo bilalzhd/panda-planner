@@ -4,7 +4,10 @@ import { requireUser, projectWhereForUser, projectScopeForUser } from '@/lib/ten
 import { decryptSecret, hashPin, verifyPin } from '@/lib/crypto'
 
 export async function POST(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const { pin } = await req.json().catch(() => ({}))
   if (!pin || typeof pin !== 'string' || pin.length < 4) {
     return Response.json({ error: 'PIN required (min 4 chars)' }, { status: 400 })

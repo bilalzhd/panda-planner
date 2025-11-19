@@ -7,7 +7,10 @@ import { sendTaskAssignedEmail, sendTaskStatusChangedEmail } from '@/lib/email'
 type Params = { params: { id: string } }
 
 export async function GET(_req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({
     where: { id: params.id, project: projectWhere },
@@ -18,7 +21,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const existing = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere }, include: { project: true } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -60,7 +66,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const existing = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere } })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })

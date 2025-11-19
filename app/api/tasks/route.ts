@@ -5,7 +5,10 @@ import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib
 import { sendTaskAssignedEmail } from '@/lib/email'
 
 export async function GET(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const projectId = searchParams.get('projectId') || undefined
@@ -28,7 +31,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = taskSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const project = await prisma.project.findFirst({ where: { id: parsed.data.projectId, AND: [projectWhere] } })
   if (!project) return Response.json({ error: 'Forbidden' }, { status: 403 })

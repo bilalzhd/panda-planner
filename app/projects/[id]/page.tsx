@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
-import { requireUser, projectWhereForUser, isSuperAdmin } from '@/lib/tenant'
+import { requireUser, projectWhereForUser, projectScopeForUser } from '@/lib/tenant'
 import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
 import { EditableProjectTitle } from '@/components/editable-project-title'
@@ -9,14 +9,15 @@ import { ArchiveProject } from '@/components/archive-project'
 export const dynamic = 'force-dynamic'
 
 async function getProject(id: string) {
-  const { user } = await requireUser()
-  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
+  const { user, workspaceId } = await requireUser()
+  const scope = await projectScopeForUser(user.id, workspaceId)
+  const projectWhere = await projectWhereForUser(user.id, { includeArchived: true, workspaceId })
   const project = await prisma.project.findFirst({
     where: { id, AND: [projectWhere] },
     include: { tasks: { orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], include: { assignedTo: true, createdBy: true, timesheets: true } } },
   })
   if (!project) notFound()
-  const superAdmin = isSuperAdmin(user)
+  const superAdmin = scope.isSuperAdmin
   const directAccess = superAdmin
     ? null
     : await prisma.projectAccess.findUnique({ where: { projectId_userId: { projectId: project.id, userId: user.id } } })

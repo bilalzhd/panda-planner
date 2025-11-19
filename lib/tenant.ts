@@ -7,6 +7,18 @@ const WORKSPACE_FREE_LIMIT = Number(process.env.WORKSPACE_FREE_LIMIT || 2)
 const WORKSPACE_COOKIE = 'pp-workspace'
 export const WORKSPACE_COOKIE_NAME = WORKSPACE_COOKIE
 
+export class WorkspaceRequiredError extends Error {
+  constructor(message = 'No workspace memberships found') {
+    super(message)
+    this.name = 'WorkspaceRequiredError'
+  }
+}
+
+type WorkspaceContext = {
+  workspaceId: string | null
+  membershipIds: string[]
+}
+
 function readWorkspaceCookie() {
   try {
     return cookies().get(WORKSPACE_COOKIE)?.value || null
@@ -15,9 +27,13 @@ function readWorkspaceCookie() {
   }
 }
 
-async function resolveWorkspaceId(userId: string) {
+async function resolveWorkspaceContext(userId: string): Promise<WorkspaceContext> {
   const cookieId = readWorkspaceCookie()
-  const memberships = await prisma.membership.findMany({ where: { userId }, select: { teamId: true } })
+  const memberships = await prisma.membership.findMany({
+    where: { userId },
+    select: { teamId: true },
+    orderBy: { createdAt: 'asc' },
+  })
   const membershipIds = memberships.map((m) => m.teamId)
 
   if (cookieId && membershipIds.includes(cookieId)) {
@@ -27,11 +43,16 @@ async function resolveWorkspaceId(userId: string) {
   return { workspaceId: membershipIds[0] || null, membershipIds }
 }
 
-export async function getWorkspaceContext(userId: string) {
-  return resolveWorkspaceId(userId)
+export async function getWorkspaceContext(userId: string): Promise<WorkspaceContext> {
+  return resolveWorkspaceContext(userId)
 }
 
-export async function requireUser() {
+type RequireUserOptions = {
+  requireWorkspace?: boolean
+}
+
+export async function requireUser(opts: RequireUserOptions = {}) {
+  const { requireWorkspace = false } = opts
   const { userId } = auth()
   if (!userId) throw new Error('Unauthorized')
   // Fetch Clerk user details best-effort; avoid hard failure during render
@@ -69,14 +90,25 @@ export async function requireUser() {
     }
   }
 
-  const { workspaceId } = await getWorkspaceContext(user.id)
-  let isWorkspaceOwner = false
-  if (workspaceId) {
-    const workspace = await prisma.team.findUnique({ where: { id: workspaceId }, select: { ownerId: true } })
-    isWorkspaceOwner = workspace?.ownerId === user.id
+  const { workspaceId, membershipIds } = await getWorkspaceContext(user.id)
+  const hasMemberships = membershipIds.length > 0
+  if (!hasMemberships && requireWorkspace) {
+    throw new WorkspaceRequiredError('Join or create a workspace to continue')
   }
 
-  return { user, workspaceId, isSuperAdmin: isWorkspaceOwner }
+  let isWorkspaceOwner = false
+  let workspace: { id: string; name: string; ownerId: string } | null = null
+  if (workspaceId) {
+    workspace = await prisma.team.findUnique({
+      where: { id: workspaceId },
+      select: { id: true, name: true, ownerId: true },
+    })
+    isWorkspaceOwner = workspace?.ownerId === user.id
+  } else if (requireWorkspace) {
+    throw new WorkspaceRequiredError('Select an active workspace')
+  }
+
+  return { user, workspaceId, workspace, membershipIds, hasMemberships, isSuperAdmin: !!(workspaceId && isWorkspaceOwner) }
 }
 
 export function workspaceLimit() {
@@ -104,15 +136,15 @@ export type ProjectScope = {
   isSuperAdmin: boolean
 }
 
-export async function projectScopeForUser(userId: string): Promise<ProjectScope> {
-  const { workspaceId } = await getWorkspaceContext(userId)
-  if (!workspaceId) {
+export async function projectScopeForUser(userId: string, workspaceId?: string | null): Promise<ProjectScope> {
+  const resolvedWorkspaceId = workspaceId ?? (await getWorkspaceContext(userId)).workspaceId
+  if (!resolvedWorkspaceId) {
     return { workspaceId: null, projectIds: [], accessMap: {}, isSuperAdmin: false }
   }
-  const workspace = await prisma.team.findUnique({ where: { id: workspaceId }, select: { ownerId: true } })
+  const workspace = await prisma.team.findUnique({ where: { id: resolvedWorkspaceId }, select: { ownerId: true } })
   const isOwner = workspace?.ownerId === userId
   const projects = await prisma.project.findMany({
-    where: { teamId: workspaceId },
+    where: { teamId: resolvedWorkspaceId },
     select: { id: true },
   })
   const projectIds = projects.map((p) => p.id)
@@ -128,7 +160,7 @@ export async function projectScopeForUser(userId: string): Promise<ProjectScope>
       accessMap[entry.projectId] = entry.accessLevel
     })
   }
-  return { workspaceId, projectIds, accessMap, isSuperAdmin: isOwner }
+  return { workspaceId: resolvedWorkspaceId, projectIds, accessMap, isSuperAdmin: isOwner }
 }
 
 export function buildProjectWhere(
@@ -148,8 +180,11 @@ export function buildProjectWhere(
   return { AND: [clause, { archivedAt: null }] }
 }
 
-export async function projectWhereForUser(userId: string, opts: { includeArchived?: boolean } = {}) {
-  const scope = await projectScopeForUser(userId)
+export async function projectWhereForUser(
+  userId: string,
+  opts: { includeArchived?: boolean; workspaceId?: string | null } = {},
+) {
+  const scope = await projectScopeForUser(userId, opts.workspaceId)
   return buildProjectWhere(scope, opts)
 }
 
@@ -187,18 +222,20 @@ export type UserCapability = {
   canDeleteUsers: boolean
 }
 
-export async function getUserCapability(userId: string): Promise<UserCapability> {
+export async function getUserCapability(userId: string, workspaceId?: string | null): Promise<UserCapability> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { permissions: true },
   })
-  const { workspaceId } = await getWorkspaceContext(userId)
-  const workspace = workspaceId ? await prisma.team.findUnique({ where: { id: workspaceId }, select: { ownerId: true } }) : null
+  const resolvedWorkspaceId = workspaceId ?? (await getWorkspaceContext(userId)).workspaceId
+  const workspace = resolvedWorkspaceId
+    ? await prisma.team.findUnique({ where: { id: resolvedWorkspaceId }, select: { ownerId: true } })
+    : null
   const isOwner = workspace?.ownerId === userId
   const perms = user?.permissions
-  const canAccessUsers = !!workspaceId && (isOwner || !!perms?.canAccessUsers)
+  const canAccessUsers = !!resolvedWorkspaceId && (isOwner || !!perms?.canAccessUsers)
   return {
-    isSuperAdmin: !!(workspaceId && isOwner),
+    isSuperAdmin: !!(resolvedWorkspaceId && isOwner),
     canAccessUsers,
     canCreateUsers: canAccessUsers && (isOwner || !!perms?.canCreateUsers),
     canEditUsers: canAccessUsers && (isOwner || !!perms?.canEditUsers),

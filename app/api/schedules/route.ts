@@ -3,7 +3,10 @@ import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib
 import { NextRequest } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const { searchParams } = new URL(req.url)
   const taskId = searchParams.get('taskId') || undefined
   const projectWhere = await projectWhereForUser(user.id)
@@ -20,7 +23,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const body = await req.json()
   const taskId = String(body?.taskId || '')
   const isRecurring = !!body?.isRecurring

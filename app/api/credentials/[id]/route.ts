@@ -5,7 +5,10 @@ import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib
 type Params = { params: { id: string } }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   // Ensure the credential belongs to a project within user's teams
   const cred = await prisma.credential.findFirst({

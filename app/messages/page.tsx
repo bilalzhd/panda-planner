@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser, isSuperAdmin } from '@/lib/tenant'
+import { requireUser } from '@/lib/tenant'
 import { DirectMessages } from '@/components/direct-messages'
 
 export const dynamic = 'force-dynamic'
@@ -12,70 +12,74 @@ type Recipient = {
   isSuperAdmin: boolean
 }
 
-async function getRecipients(userId: string, superAdminEmail?: string | null) {
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  if (!user) return []
-  const currentIsSuper = isSuperAdmin(user)
+async function getRecipients(userId: string, workspaceId: string, workspaceOwnerId: string | null) {
+  const currentIsSuper = workspaceOwnerId === userId
+  let myProjectIds: string[] = []
   if (currentIsSuper) {
-    const others = await prisma.user.findMany({
-      where: { id: { not: user.id } },
-      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+    const projects = await prisma.project.findMany({
+      where: { teamId: workspaceId },
+      select: { id: true },
     })
-    return others.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      sharedProjects: [],
-      isSuperAdmin: isSuperAdmin(u),
-    }))
+    myProjectIds = projects.map((p) => p.id)
+  } else {
+    const myProjects = await prisma.projectAccess.findMany({
+      where: { userId, project: { teamId: workspaceId } },
+      select: { projectId: true },
+    })
+    myProjectIds = myProjects.map((p) => p.projectId)
   }
-  const myProjects = await prisma.projectAccess.findMany({
-    where: { userId },
-    select: { projectId: true },
-  })
-  const projectIds = myProjects.map((p) => p.projectId)
-  let recipients: Recipient[] = []
-  if (projectIds.length > 0) {
-    const others = await prisma.user.findMany({
-      where: {
-        id: { not: user.id },
-        projectAccesses: { some: { projectId: { in: projectIds } } },
-      },
-      include: {
-        projectAccesses: {
-          where: { projectId: { in: projectIds } },
-          include: { project: { select: { name: true } } },
+  const memberships = await prisma.membership.findMany({
+    where: { teamId: workspaceId, userId: { not: userId } },
+    include: {
+      user: {
+        include: {
+          projectAccesses: {
+            where: { project: { teamId: workspaceId } },
+            include: { project: { select: { name: true } } },
+          },
         },
       },
-      orderBy: [{ name: 'asc' }, { email: 'asc' }],
+      team: { select: { ownerId: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+  return memberships
+    .map((member) => {
+      const u = member.user
+      const sharedProjects = currentIsSuper
+        ? u.projectAccesses.map((pa) => pa.project?.name || '').filter((n): n is string => !!n)
+        : u.projectAccesses
+            .filter((pa) => myProjectIds.includes(pa.projectId))
+            .map((pa) => pa.project?.name || '')
+            .filter((n): n is string => !!n)
+      const recipientIsSuper = member.team?.ownerId === u.id
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        sharedProjects,
+        isSuperAdmin: recipientIsSuper,
+      }
     })
-    recipients = others.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      sharedProjects: u.projectAccesses.map((pa) => pa.project?.name || '').filter((n): n is string => !!n),
-      isSuperAdmin: isSuperAdmin(u),
-    }))
-  }
-  if (superAdminEmail) {
-    const admin = await prisma.user.findFirst({ where: { email: superAdminEmail } })
-    if (admin && admin.id !== user.id && !recipients.some((r) => r.id === admin.id)) {
-      recipients.unshift({
-        id: admin.id,
-        name: admin.name,
-        email: admin.email,
-        sharedProjects: [],
-        isSuperAdmin: true,
-      })
-    }
-  }
-  return recipients
+    .filter((recipient) => currentIsSuper || recipient.isSuperAdmin || recipient.sharedProjects.length > 0)
+    .sort((a, b) => {
+      const aName = a.name || a.email || ''
+      const bName = b.name || b.email || ''
+      return aName.localeCompare(bName)
+    })
 }
 
 export default async function MessagesPage() {
-  const { user } = await requireUser()
-  const superEmail = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase() || null
-  const recipients = await getRecipients(user.id, superEmail)
+  const { user, workspace } = await requireUser()
+  if (!workspace) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-xl font-semibold">Direct Messages</h1>
+        <p className="text-sm text-white/60">Select or create a workspace to start messaging teammates.</p>
+      </div>
+    )
+  }
+  const recipients = await getRecipients(user.id, workspace.id, workspace.ownerId)
   const first = recipients[0]
   let initialMessages: any[] = []
   if (first) {

@@ -7,7 +7,8 @@ import { randomUUID } from 'crypto'
 type Ctx = { params: { id: string } }
 
 async function ensureProjectAccess(projectId: string, level: 'READ' | 'EDIT') {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) return null
   const projectWhere = await projectWhereForUser(user.id, { includeArchived: true })
   const project = await prisma.project.findFirst({ where: { id: projectId, AND: [projectWhere] } })
   if (!project) return null

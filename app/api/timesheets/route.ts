@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server'
 import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 
 export async function GET(req: NextRequest) {
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const { searchParams } = new URL(req.url)
   const taskId = searchParams.get('taskId') || undefined
@@ -31,7 +34,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = timesheetSchema.safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
-  const { user } = await requireUser()
+  const { user, workspaceId } = await requireUser()
+  if (!workspaceId) {
+    return Response.json({ error: 'Select a workspace first' }, { status: 400 })
+  }
   const projectWhere = await projectWhereForUser(user.id)
   const task = await prisma.task.findFirst({ where: { id: parsed.data.taskId, project: projectWhere } })
   if (!task) return Response.json({ error: 'Forbidden' }, { status: 403 })
