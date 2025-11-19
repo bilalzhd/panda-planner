@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, getUserCapability } from '@/lib/tenant'
+import { requireUser, getUserCapability, workspaceLimit } from '@/lib/tenant'
 import { sendWorkspaceInviteEmail } from '@/lib/email'
 
 type AccessInput = { projectId: string; accessLevel: 'READ' | 'EDIT' }
@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
   if (!rawEmail) return Response.json({ error: 'Email is required' }, { status: 400 })
   const email = normalizeEmail(rawEmail)
   const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) return Response.json({ error: 'Email already exists' }, { status: 409 })
   const name = typeof body?.name === 'string' ? body.name.trim() : null
   const accesses = Array.isArray(body?.projectAccesses) ? (body.projectAccesses as AccessInput[]) : []
   const permissionsInput = body?.permissions || {}
@@ -92,10 +91,71 @@ export async function POST(req: NextRequest) {
     select: { id: true, name: true },
   })
   const allowedMap = new Map(allowedProjects.map((p) => [p.id, p.name]))
-  const cleanedAccesses = accesses
-    .filter((a) => typeof a?.projectId === 'string' && allowedMap.has(a.projectId) && (a.accessLevel === 'READ' || a.accessLevel === 'EDIT'))
-    .map((a) => ({ projectId: a.projectId, userId: created.id, accessLevel: a.accessLevel }))
+  const buildAccessPayload = (userId: string) =>
+    accesses
+      .filter(
+        (a) =>
+          typeof a?.projectId === 'string' &&
+          allowedMap.has(a.projectId) &&
+          (a.accessLevel === 'READ' || a.accessLevel === 'EDIT'),
+      )
+      .map((a) => ({ projectId: a.projectId, userId, accessLevel: a.accessLevel }))
 
+  if (existing) {
+    const alreadyMember = await prisma.membership.findUnique({
+      where: { teamId_userId: { teamId: workspaceId, userId: existing.id } },
+    })
+    if (alreadyMember) {
+      return Response.json({ error: 'User is already a member of this workspace' }, { status: 409 })
+    }
+    const maxWorkspaces = workspaceLimit()
+    if (maxWorkspaces > 0) {
+      const membershipCount = await prisma.membership.count({ where: { userId: existing.id } })
+      if (membershipCount >= maxWorkspaces) {
+        return Response.json({ error: 'User already has full workspaces' }, { status: 409 })
+      }
+    }
+    const updatedAccesses = buildAccessPayload(existing.id)
+    if (updatedAccesses.length) {
+      await prisma.projectAccess.createMany({ data: updatedAccesses, skipDuplicates: true })
+    }
+    await prisma.membership.create({
+      data: { teamId: workspaceId, userId: existing.id, role: 'MEMBER' },
+    })
+    await prisma.userPermission.upsert({
+      where: { userId: existing.id },
+      create: {
+        userId: existing.id,
+        canAccessUsers: !!permissionsInput?.canAccessUsers,
+        canCreateUsers: !!permissionsInput?.canCreateUsers,
+        canEditUsers: !!permissionsInput?.canEditUsers,
+        canDeleteUsers: !!permissionsInput?.canDeleteUsers,
+      },
+      update: {
+        canAccessUsers: !!permissionsInput?.canAccessUsers,
+        canCreateUsers: !!permissionsInput?.canCreateUsers,
+        canEditUsers: !!permissionsInput?.canEditUsers,
+        canDeleteUsers: !!permissionsInput?.canDeleteUsers,
+      },
+    })
+    if (existing.email) {
+      const assignedNames = updatedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
+      try {
+        await sendWorkspaceInviteEmail({
+          to: existing.email,
+          recipientName: existing.name,
+          workspaceName: workspace?.name || 'PandaPlanner Workspace',
+          inviter: { name: user.name, email: user.email },
+          projects: assignedNames,
+        })
+      } catch (e) {
+        console.error('Failed to send workspace invite', e)
+      }
+    }
+    return Response.json({ id: existing.id, invited: true }, { status: 200 })
+  }
+
+  const cleanedAccesses = buildAccessPayload(created.id)
   if (cleanedAccesses.length) {
     await prisma.projectAccess.createMany({ data: cleanedAccesses })
   }
