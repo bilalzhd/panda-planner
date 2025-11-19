@@ -1,5 +1,5 @@
 [build]
-  command = "npm run prisma:push --accept-data-loss && npm run build"
+  command = "npm run prisma:put && npm run build"
 
 [build.environment]
   # So npm doesn't fail installs on peer conflicts in cached lockfiles
