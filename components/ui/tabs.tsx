@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 
 type Tab = {
   key: string
@@ -10,26 +10,20 @@ type Tab = {
   disabledReason?: string
 }
 
-export function Tabs({ tabs, initial, onChange }: { tabs: Tab[]; initial?: string; onChange?: (key: string) => void }) {
+export function Tabs({ tabs, active, onChange }: { tabs: Tab[]; active?: string; onChange?: (key: string) => void }) {
   const firstEnabled = tabs.find((t) => !t.disabled)?.key || tabs[0]?.key
-  const initialKey = (initial && tabs.find((t) => t.key === initial && !t.disabled)?.key) || firstEnabled
-  const [active, setActive] = useState<string>(initialKey as string)
+  const activeKey = (active && tabs.find((t) => t.key === active && !t.disabled)?.key) || firstEnabled
   const id = useId()
 
   useEffect(() => {
-    const next = (initial && tabs.find((t) => t.key === initial && !t.disabled)?.key) || tabs.find((t) => !t.disabled)?.key || tabs[0]?.key
-    if (next && next !== active) setActive(next)
-  }, [initial, tabs, active])
-
-  useEffect(() => {
-    onChange?.(active)
-  }, [active])
+    if (activeKey && activeKey !== active) onChange?.(activeKey)
+  }, [active, activeKey, onChange])
 
   return (
     <div className="border-b border-white/10">
       <div role="tablist" aria-label="Project Views" className="flex items-center gap-1 overflow-x-auto">
         {tabs.map((t) => {
-          const selected = active === t.key
+          const selected = activeKey === t.key
           return (
             <button
               disabled={!!t.disabled}
@@ -44,7 +38,7 @@ export function Tabs({ tabs, initial, onChange }: { tabs: Tab[]; initial?: strin
                   ? 'bg-white/[0.06] text-white border border-white/10 border-b-transparent'
                   : 'text-white/70 hover:text-white'
               }`}
-              onClick={() => { if (!t.disabled) setActive(t.key) }}
+              onClick={() => { if (!t.disabled && t.key !== activeKey) onChange?.(t.key) }}
             >
               {t.icon && <span className="opacity-80">{t.icon}</span>}
               <span>{t.label}</span>

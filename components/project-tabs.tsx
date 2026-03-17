@@ -41,27 +41,33 @@ export function ProjectTabs({
 }: ProjectTabsProps) {
   const [active, setActive] = useState(initialTab || 'board')
   const [description, setDescription] = useState<string | null>(null)
-  const [loaded, setLoaded] = useState(false)
   const [healthAuto, setHealthAuto] = useState(true)
   const [health, setHealth] = useState<'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK'>(() => computeHealth(tasks))
   const canEdit = accessLevel === 'EDIT'
 
-  // On mount, fetch minimal project info for description + health
-  // Using GET on the page already loaded data would be nicer, but we keep it minimal.
-  if (typeof window !== 'undefined' && !loaded) {
-    setLoaded(true)
-    ;(async () => {
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadProjectMeta() {
       try {
         const res = await fetch(`/api/projects/${projectId}`, { cache: 'no-store' })
-        if (res.ok) {
-          const p = await res.json()
-          setDescription(p.description || '')
-          if (p.health) setHealth(p.health)
-          if (typeof p.healthAuto === 'boolean') setHealthAuto(p.healthAuto)
-        }
+        if (!res.ok) return
+
+        const p = await res.json()
+        if (cancelled) return
+
+        setDescription(p.description || '')
+        if (p.health) setHealth(p.health)
+        if (typeof p.healthAuto === 'boolean') setHealthAuto(p.healthAuto)
       } catch {}
-    })()
-  }
+    }
+
+    loadProjectMeta()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
 
   const tabs = useMemo(() => ([
     { key: 'overview', label: 'Overview', icon: iconOverview },
@@ -83,7 +89,7 @@ export function ProjectTabs({
     <div className="mt-2">
       <Tabs
         tabs={tabs}
-        initial={active}
+        active={active}
         onChange={setActive}
       />
 

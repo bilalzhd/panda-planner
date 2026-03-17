@@ -89,6 +89,7 @@ export function UserManagement({
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<FormState>(() => createFormState(projects))
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
 
   function openCreate() {
     setError(null)
@@ -158,6 +159,16 @@ export function UserManagement({
     }
   }
 
+  function toggleProjectBulk(enable: boolean) {
+    setForm((prev) => {
+      const nextProjects: FormState['projects'] = {}
+      Object.entries(prev.projects).forEach(([projectId, cfg]) => {
+        nextProjects[projectId] = { enabled: enable, level: cfg.level }
+      })
+      return { ...prev, projects: nextProjects }
+    })
+  }
+
   async function deleteUser(target: ManagedUser) {
     const confirmed = window.confirm(`Delete ${target.name || target.email || 'this user'}? This cannot be undone.`)
     if (!confirmed) return
@@ -224,13 +235,24 @@ export function UserManagement({
                   {!u.isSuperAdmin && u.accesses.length === 0 && <div>No access assigned</div>}
                   {!u.isSuperAdmin && u.accesses.length > 0 && (
                     <ul className="space-y-1">
-                      {u.accesses.map((acc) => (
+                      {(expandedProjects[u.id] ? u.accesses : u.accesses.slice(0, 2)).map((acc) => (
                         <li key={`${u.id}-${acc.projectId}`} className="flex items-center justify-between gap-2">
                           <span>{acc.projectName || 'Project'}</span>
                           <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] uppercase tracking-wide">{acc.accessLevel}</span>
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {!u.isSuperAdmin && u.accesses.length > 2 && (
+                    <button
+                      type="button"
+                      className="mt-2 text-[11px] text-white/60 hover:text-white/80 underline"
+                      onClick={() =>
+                        setExpandedProjects((prev) => ({ ...prev, [u.id]: !prev[u.id] }))
+                      }
+                    >
+                      {expandedProjects[u.id] ? 'Show less' : `Show ${u.accesses.length - 2} more`}
+                    </button>
                   )}
                 </td>
                 <td className="px-4 py-3 text-xs text-white/70">
@@ -287,6 +309,26 @@ export function UserManagement({
           />
           <div>
             <div className="mb-2 text-sm font-semibold text-white">Project access</div>
+            {projects.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-white/70">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => toggleProjectBulk(true)}
+                >
+                  Select all
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7"
+                  onClick={() => toggleProjectBulk(false)}
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
             <div className="space-y-2 max-h-60 overflow-auto pr-1 -mr-1">
               {projects.map((project) => {
                 const cfg = form.projects[project.id] || { enabled: false, level: 'READ' as AccessLevel }

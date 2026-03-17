@@ -16,6 +16,7 @@ type MediaItem = {
 export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: number }) {
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -24,9 +25,21 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
 
   async function load() {
     setLoading(true)
-    const res = await fetch(`/api/projects/${projectId}/media`, { cache: 'no-store' })
-    setLoading(false)
-    if (res.ok) setItems(await res.json())
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/media`, { cache: 'no-store' })
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '')
+        throw new Error(bodyText || res.statusText || 'Failed to load media')
+      }
+      const data = await res.json()
+      setItems(data)
+    } catch (err) {
+      console.error('Unable to load project media', err)
+      setError('Unable to load media files. Please try again or check the storage connection.')
+    } finally {
+      setLoading(false)
+    }
   }
   useEffect(() => { load() }, [projectId])
 
@@ -71,8 +84,11 @@ export function ProjectMedia({ projectId, limit }: { projectId: string; limit?: 
       </div>
       <div className="p-3">
         {loading && <div className="text-sm text-white/60">Loading...</div>}
-        {!loading && items.length === 0 && <div className="text-sm text-white/60">No media files yet.</div>}
-        {!loading && items.length > 0 && (
+        {!loading && error && (
+          <div className="text-sm text-rose-300">{error}</div>
+        )}
+        {!loading && !error && items.length === 0 && <div className="text-sm text-white/60">No media files yet.</div>}
+        {!loading && !error && items.length > 0 && (
           <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {displayed.map((m) => (
               <li key={m.path} className="rounded-md border border-white/10 bg-white/5 p-0 overflow-hidden text-sm">
