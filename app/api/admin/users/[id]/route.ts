@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireUser, getUserCapability } from '@/lib/tenant'
 
 type AccessInput = { projectId: string; accessLevel: 'READ' | 'EDIT' }
+type WorkspaceRoleInput = 'MEMBER' | 'ADMIN'
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -27,10 +28,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
   const targetIsOwner = membership.team?.ownerId === target.id
+  const targetIsWorkspaceAdmin = targetIsOwner || membership.role === 'ADMIN'
   if (targetIsOwner && !capability.isSuperAdmin) {
     return Response.json({ error: 'Cannot modify workspace owner' }, { status: 403 })
   }
   const body = await req.json().catch(() => ({}))
+  const workspaceRole: WorkspaceRoleInput = body?.workspaceRole === 'ADMIN' ? 'ADMIN' : 'MEMBER'
+  if (targetIsWorkspaceAdmin && !capability.isWorkspaceAdmin && !targetIsOwner) {
+    return Response.json({ error: 'Only workspace admins can modify other admins' }, { status: 403 })
+  }
+  if (workspaceRole === 'ADMIN' && !capability.isWorkspaceAdmin) {
+    return Response.json({ error: 'Only workspace admins can assign admin access' }, { status: 403 })
+  }
   const updates: any = {}
   if (typeof body?.name === 'string') updates.name = body.name.trim() || null
   if (typeof body?.email === 'string' && body.email.trim()) {
@@ -50,7 +59,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   })
   if (targetIsOwner) {
     // owners have implicit edit access to all projects
-  } else if (accesses.length) {
+  } else {
+    await prisma.membership.update({
+      where: { teamId_userId: { teamId: workspaceId, userId: target.id } },
+      data: { role: workspaceRole },
+    })
+  }
+  if (!targetIsOwner && workspaceRole !== 'ADMIN' && accesses.length) {
     const allowedProjects = await prisma.project.findMany({
       where: { teamId: workspaceId },
       select: { id: true },
@@ -111,6 +126,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const targetIsOwner = membership.team?.ownerId === target.id
   if (targetIsOwner) {
     return Response.json({ error: 'Cannot delete workspace owner' }, { status: 403 })
+  }
+  if (membership.role === 'ADMIN' && !capability.isWorkspaceAdmin) {
+    return Response.json({ error: 'Only workspace admins can delete other admins' }, { status: 403 })
   }
   await prisma.projectAccess.deleteMany({ where: { userId: target.id, project: { teamId: workspaceId } } })
   await prisma.userPermission.deleteMany({ where: { userId: target.id } })

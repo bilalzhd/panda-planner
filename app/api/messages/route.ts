@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser } from '@/lib/tenant'
+import { getWorkspaceAdminState, requireUser } from '@/lib/tenant'
 import { sendDirectMessageEmail } from '@/lib/email'
 
 async function getSharedProjects(
@@ -46,8 +46,9 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: 'Not found' }, { status: 404 })
   }
   const workspaceOwnerId = workspace?.ownerId || null
-  const currentIsSuper = workspaceOwnerId === user.id
-  const partnerIsSuper = workspaceOwnerId === partner.id
+  const currentAdminState = await getWorkspaceAdminState(user.id, workspaceId)
+  const currentIsSuper = currentAdminState.isWorkspaceAdmin
+  const partnerIsSuper = workspaceOwnerId === partner.id || membership.role === 'ADMIN'
   let shared = await getSharedProjects(user.id, partnerId, workspaceId, currentIsSuper)
   if (!currentIsSuper && !partnerIsSuper && shared.length === 0) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
@@ -86,8 +87,9 @@ export async function POST(req: NextRequest) {
   }
   if (partner.id === user.id) return Response.json({ error: 'Cannot message yourself' }, { status: 400 })
   const workspaceOwnerId = workspace?.ownerId || null
-  const currentIsSuper = workspaceOwnerId === user.id
-  const partnerIsSuper = workspaceOwnerId === partner.id
+  const currentAdminState = await getWorkspaceAdminState(user.id, workspaceId)
+  const currentIsSuper = currentAdminState.isWorkspaceAdmin
+  const partnerIsSuper = workspaceOwnerId === partner.id || membership.role === 'ADMIN'
   const shared = await getSharedProjects(user.id, receiverId, workspaceId, currentIsSuper)
   if (!currentIsSuper && !partnerIsSuper && shared.length === 0) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })

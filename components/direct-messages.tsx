@@ -135,7 +135,7 @@ export function DirectMessages({
                   <div className="mt-1 text-[11px] text-white/60">{r.sharedProjects.join(', ')}</div>
                 )}
                 {r.isSuperAdmin && (
-                  <div className="mt-1 inline-flex items-center rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">Super Admin</div>
+                  <div className="mt-1 inline-flex items-center rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-200">Workspace Admin</div>
                 )}
               </button>
             </li>

@@ -10,7 +10,8 @@ type ManagedUser = {
   id: string
   name: string | null
   email: string | null
-  isSuperAdmin?: boolean
+  isWorkspaceOwner?: boolean
+  isWorkspaceAdmin?: boolean
   accesses: { projectId: string; projectName?: string | null; accessLevel: AccessLevel }[]
   permissions: {
     canAccessUsers: boolean
@@ -24,6 +25,7 @@ type ProjectInfo = { id: string; name: string }
 
 type Capability = {
   isSuperAdmin: boolean
+  isWorkspaceAdmin: boolean
   canAccessUsers: boolean
   canCreateUsers: boolean
   canEditUsers: boolean
@@ -34,6 +36,7 @@ type FormState = {
   id?: string
   name: string
   email: string
+  workspaceRole: 'MEMBER' | 'ADMIN'
   projects: Record<string, { enabled: boolean; level: AccessLevel }>
   permissions: {
     canAccessUsers: boolean
@@ -68,6 +71,7 @@ function createFormState(projects: ProjectInfo[], user?: ManagedUser): FormState
     id: user?.id,
     name: user?.name || '',
     email: user?.email || '',
+    workspaceRole: user?.isWorkspaceAdmin && !user?.isWorkspaceOwner ? 'ADMIN' : 'MEMBER',
     projects: buildProjectState(projects, user),
     permissions: user ? { ...emptyPermissions, ...user.permissions } : { ...emptyPermissions },
   }
@@ -130,6 +134,7 @@ export function UserManagement({
     const body = {
       name: form.name.trim() || null,
       email: form.email.trim(),
+      workspaceRole: form.workspaceRole,
       projectAccesses: payloadProjects,
       permissions: { ...form.permissions },
     }
@@ -164,6 +169,16 @@ export function UserManagement({
       const nextProjects: FormState['projects'] = {}
       Object.entries(prev.projects).forEach(([projectId, cfg]) => {
         nextProjects[projectId] = { enabled: enable, level: cfg.level }
+      })
+      return { ...prev, projects: nextProjects }
+    })
+  }
+
+  function setAllProjectsLevel(level: AccessLevel) {
+    setForm((prev) => {
+      const nextProjects: FormState['projects'] = {}
+      Object.keys(prev.projects).forEach((projectId) => {
+        nextProjects[projectId] = { enabled: true, level }
       })
       return { ...prev, projects: nextProjects }
     })
@@ -226,14 +241,15 @@ export function UserManagement({
                 <td className="px-4 py-3">
                   <div className="font-medium text-white/90 flex items-center gap-2">
                     {u.name || u.email || 'User'}
-                    {u.isSuperAdmin && <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] text-emerald-200">Super Admin</span>}
+                    {u.isWorkspaceOwner && <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] text-emerald-200">Owner</span>}
+                    {!u.isWorkspaceOwner && u.isWorkspaceAdmin && <span className="rounded bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-200">Admin</span>}
                   </div>
                   <div className="text-xs text-white/50">{u.email || '—'}</div>
                 </td>
                 <td className="px-4 py-3 text-xs text-white/70">
-                  {u.isSuperAdmin && <div>All projects (edit)</div>}
-                  {!u.isSuperAdmin && u.accesses.length === 0 && <div>No access assigned</div>}
-                  {!u.isSuperAdmin && u.accesses.length > 0 && (
+                  {u.isWorkspaceAdmin && <div>All projects (edit)</div>}
+                  {!u.isWorkspaceAdmin && u.accesses.length === 0 && <div>No access assigned</div>}
+                  {!u.isWorkspaceAdmin && u.accesses.length > 0 && (
                     <ul className="space-y-1">
                       {(expandedProjects[u.id] ? u.accesses : u.accesses.slice(0, 2)).map((acc) => (
                         <li key={`${u.id}-${acc.projectId}`} className="flex items-center justify-between gap-2">
@@ -243,7 +259,7 @@ export function UserManagement({
                       ))}
                     </ul>
                   )}
-                  {!u.isSuperAdmin && u.accesses.length > 2 && (
+                  {!u.isWorkspaceAdmin && u.accesses.length > 2 && (
                     <button
                       type="button"
                       className="mt-2 text-[11px] text-white/60 hover:text-white/80 underline"
@@ -256,7 +272,11 @@ export function UserManagement({
                   )}
                 </td>
                 <td className="px-4 py-3 text-xs text-white/70">
-                  {u.permissions.canAccessUsers ? (
+                  {u.isWorkspaceOwner ? (
+                    <div>Full workspace owner access</div>
+                  ) : u.isWorkspaceAdmin ? (
+                    <div>Full workspace admin access</div>
+                  ) : u.permissions.canAccessUsers ? (
                     <div>
                       <div>Access Users</div>
                       <ul className="mt-1 space-y-1 text-[11px] text-white/50">
@@ -271,12 +291,12 @@ export function UserManagement({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="inline-flex items-center gap-2">
-                    {capability.canEditUsers && !u.isSuperAdmin && (
+                    {capability.canEditUsers && !u.isWorkspaceOwner && (!u.isWorkspaceAdmin || capability.isWorkspaceAdmin) && (
                       <Button variant="ghost" className="h-8 px-3 text-xs" onClick={() => openEdit(u)}>
                         Edit
                       </Button>
                     )}
-                    {capability.canDeleteUsers && !u.isSuperAdmin && u.id !== currentUserId && (
+                    {capability.canDeleteUsers && !u.isWorkspaceOwner && (!u.isWorkspaceAdmin || capability.isWorkspaceAdmin) && u.id !== currentUserId && (
                       <Button
                         variant="ghost"
                         className="h-8 px-3 text-xs text-rose-300 hover:text-rose-200"
@@ -307,21 +327,52 @@ export function UserManagement({
             value={form.email}
             onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
           />
+          {capability.isWorkspaceAdmin && (
+            <div className="rounded-md border border-white/10 bg-white/5 px-3 py-3">
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.workspaceRole === 'ADMIN'}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      workspaceRole: e.target.checked ? 'ADMIN' : 'MEMBER',
+                    }))
+                  }
+                />
+                <span>
+                  <span className="block font-medium text-white">Workspace admin</span>
+                  <span className="block text-xs text-white/60">
+                    Gives edit access to all current and future projects, plus full access to the Users section.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
           <div>
             <div className="mb-2 text-sm font-semibold text-white">Project access</div>
-            {projects.length > 0 && (
+            {form.workspaceRole === 'ADMIN' ? (
+              <div className="rounded-md border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
+                This user will automatically have edit access to every project in this workspace.
+              </div>
+            ) : projects.length > 0 && (
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-white/70">
                 <Button
                   variant="outline"
-                  size="sm"
                   className="h-7"
                   onClick={() => toggleProjectBulk(true)}
                 >
                   Select all
                 </Button>
                 <Button
+                  variant="outline"
+                  className="h-7"
+                  onClick={() => setAllProjectsLevel('EDIT')}
+                >
+                  All edit
+                </Button>
+                <Button
                   variant="ghost"
-                  size="sm"
                   className="h-7"
                   onClick={() => toggleProjectBulk(false)}
                 >
@@ -329,111 +380,115 @@ export function UserManagement({
                 </Button>
               </div>
             )}
-            <div className="space-y-2 max-h-60 overflow-auto pr-1 -mr-1">
-              {projects.map((project) => {
-                const cfg = form.projects[project.id] || { enabled: false, level: 'READ' as AccessLevel }
-                return (
-                  <div key={project.id} className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                    <label className="flex items-center justify-between text-sm">
-                      <span>{project.name}</span>
-                      <input
-                        type="checkbox"
-                        checked={cfg.enabled}
-                        onChange={(e) => {
-                          const enabled = e.target.checked
-                          setForm((prev) => ({
-                            ...prev,
-                            projects: {
-                              ...prev.projects,
-                              [project.id]: { ...cfg, enabled },
-                            },
-                          }))
-                        }}
-                      />
-                    </label>
-                    {cfg.enabled && (
-                      <select
-                        className="mt-2 w-full rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm"
-                        value={cfg.level}
-                        onChange={(e) => {
-                          const level = e.target.value === 'EDIT' ? 'EDIT' : 'READ'
-                          setForm((prev) => ({
-                            ...prev,
-                            projects: {
-                              ...prev.projects,
-                              [project.id]: { enabled: true, level },
-                            },
-                          }))
-                        }}
-                      >
-                        <option value="READ">Read only</option>
-                        <option value="EDIT">Edit</option>
-                      </select>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          <div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={form.permissions.canAccessUsers}
-                onChange={(e) => {
-                  const enabled = e.target.checked
-                  setForm((prev) => ({
-                    ...prev,
-                    permissions: { ...prev.permissions, canAccessUsers: enabled },
-                  }))
-                }}
-              />
-              Can access Users section
-            </label>
-            {form.permissions.canAccessUsers && (
-              <div className="ml-6 mt-2 space-y-1 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.permissions.canCreateUsers}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        permissions: { ...prev.permissions, canCreateUsers: e.target.checked },
-                      }))
-                    }
-                  />
-                  Can add users
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.permissions.canEditUsers}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        permissions: { ...prev.permissions, canEditUsers: e.target.checked },
-                      }))
-                    }
-                  />
-                  Can edit users
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.permissions.canDeleteUsers}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        permissions: { ...prev.permissions, canDeleteUsers: e.target.checked },
-                      }))
-                    }
-                  />
-                  Can delete users
-                </label>
+            {form.workspaceRole !== 'ADMIN' && (
+              <div className="space-y-2 max-h-60 overflow-auto pr-1 -mr-1">
+                {projects.map((project) => {
+                  const cfg = form.projects[project.id] || { enabled: false, level: 'READ' as AccessLevel }
+                  return (
+                    <div key={project.id} className="rounded-md border border-white/10 bg-white/5 px-3 py-2">
+                      <label className="flex items-center justify-between text-sm">
+                        <span>{project.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={cfg.enabled}
+                          onChange={(e) => {
+                            const enabled = e.target.checked
+                            setForm((prev) => ({
+                              ...prev,
+                              projects: {
+                                ...prev.projects,
+                                [project.id]: { ...cfg, enabled },
+                              },
+                            }))
+                          }}
+                        />
+                      </label>
+                      {cfg.enabled && (
+                        <select
+                          className="mt-2 w-full rounded-md border border-white/10 bg-white/10 px-2 py-1 text-sm"
+                          value={cfg.level}
+                          onChange={(e) => {
+                            const level = e.target.value === 'EDIT' ? 'EDIT' : 'READ'
+                            setForm((prev) => ({
+                              ...prev,
+                              projects: {
+                                ...prev.projects,
+                                [project.id]: { enabled: true, level },
+                              },
+                            }))
+                          }}
+                        >
+                          <option value="READ">Read only</option>
+                          <option value="EDIT">Edit</option>
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
+          {form.workspaceRole !== 'ADMIN' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.permissions.canAccessUsers}
+                  onChange={(e) => {
+                    const enabled = e.target.checked
+                    setForm((prev) => ({
+                      ...prev,
+                      permissions: { ...prev.permissions, canAccessUsers: enabled },
+                    }))
+                  }}
+                />
+                Can access Users section
+              </label>
+              {form.permissions.canAccessUsers && (
+                <div className="ml-6 mt-2 space-y-1 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.permissions.canCreateUsers}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, canCreateUsers: e.target.checked },
+                        }))
+                      }
+                    />
+                    Can add users
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.permissions.canEditUsers}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, canEditUsers: e.target.checked },
+                        }))
+                      }
+                    />
+                    Can edit users
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={form.permissions.canDeleteUsers}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          permissions: { ...prev.permissions, canDeleteUsers: e.target.checked },
+                        }))
+                      }
+                    />
+                    Can delete users
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => setDialogOpen(false)}>Cancel</Button>

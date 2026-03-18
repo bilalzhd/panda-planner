@@ -30,11 +30,14 @@ export default async function UsersPage() {
   const projects = await prisma.project.findMany({ where: { teamId: workspaceId }, orderBy: { name: 'asc' } })
   const mappedUsers = members.map((member) => {
     const u = member.user
+    const isWorkspaceOwner = member.team?.ownerId === u.id
+    const isWorkspaceAdmin = isWorkspaceOwner || member.role === 'ADMIN'
     return {
       id: u.id,
       name: u.name,
       email: u.email,
-      isSuperAdmin: member.team?.ownerId === u.id,
+      isWorkspaceOwner,
+      isWorkspaceAdmin,
       accesses: u.projectAccesses.map((p) => ({
         projectId: p.projectId,
         projectName: p.project?.name,

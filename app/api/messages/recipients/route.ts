@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser } from '@/lib/tenant'
+import { getWorkspaceAdminState, requireUser } from '@/lib/tenant'
 
 export async function GET() {
   const { user, workspaceId, workspace } = await requireUser()
   if (!workspaceId || !workspace) {
     return Response.json({ recipients: [] })
   }
-  const workspaceOwnerId = workspace.ownerId
-  const currentIsSuper = workspaceOwnerId === user.id
+  const adminState = await getWorkspaceAdminState(user.id, workspaceId)
+  const currentIsSuper = adminState.isWorkspaceAdmin
   let myProjectIds: string[] = []
   if (currentIsSuper) {
     const projects = await prisma.project.findMany({
@@ -48,7 +48,7 @@ export async function GET() {
             .filter((pa) => myProjectIds.includes(pa.projectId))
             .map((pa) => pa.project?.name || '')
             .filter((n): n is string => !!n)
-      const recipientIsSuper = member.team?.ownerId === u.id
+      const recipientIsSuper = member.team?.ownerId === u.id || member.role === 'ADMIN'
       return {
         id: u.id,
         name: u.name,

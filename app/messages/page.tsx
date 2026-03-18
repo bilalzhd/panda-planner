@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { requireUser } from '@/lib/tenant'
+import { getWorkspaceAdminState, requireUser } from '@/lib/tenant'
 import { DirectMessages } from '@/components/direct-messages'
 
 export const dynamic = 'force-dynamic'
@@ -12,8 +12,9 @@ type Recipient = {
   isSuperAdmin: boolean
 }
 
-async function getRecipients(userId: string, workspaceId: string, workspaceOwnerId: string | null) {
-  const currentIsSuper = workspaceOwnerId === userId
+async function getRecipients(userId: string, workspaceId: string) {
+  const adminState = await getWorkspaceAdminState(userId, workspaceId)
+  const currentIsSuper = adminState.isWorkspaceAdmin
   let myProjectIds: string[] = []
   if (currentIsSuper) {
     const projects = await prisma.project.findMany({
@@ -52,7 +53,7 @@ async function getRecipients(userId: string, workspaceId: string, workspaceOwner
             .filter((pa) => myProjectIds.includes(pa.projectId))
             .map((pa) => pa.project?.name || '')
             .filter((n): n is string => !!n)
-      const recipientIsSuper = member.team?.ownerId === u.id
+      const recipientIsSuper = member.team?.ownerId === u.id || member.role === 'ADMIN'
       return {
         id: u.id,
         name: u.name,
@@ -79,7 +80,7 @@ export default async function MessagesPage() {
       </div>
     )
   }
-  const recipients = await getRecipients(user.id, workspace.id, workspace.ownerId)
+  const recipients = await getRecipients(user.id, workspace.id)
   const first = recipients[0]
   let initialMessages: any[] = []
   if (first) {

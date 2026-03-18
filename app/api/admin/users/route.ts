@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireUser, getUserCapability, workspaceLimit } from '@/lib/tenant'
+import { requireUser, getUserCapability, getWorkspaceAdminState, workspaceLimit } from '@/lib/tenant'
 import { sendWorkspaceInviteEmail } from '@/lib/email'
 
 type AccessInput = { projectId: string; accessLevel: 'READ' | 'EDIT' }
+type WorkspaceRoleInput = 'MEMBER' | 'ADMIN'
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -38,11 +39,14 @@ export async function GET() {
   ])
   const mappedUsers = members.map((member) => {
     const u = member.user
+    const isWorkspaceOwner = workspace?.ownerId === u.id
+    const isWorkspaceAdmin = isWorkspaceOwner || member.role === 'ADMIN'
     return {
       id: u.id,
       name: u.name,
       email: u.email,
-      isSuperAdmin: workspace?.ownerId === u.id,
+      isWorkspaceOwner,
+      isWorkspaceAdmin,
       accesses: u.projectAccesses.map((p) => ({
         projectId: p.projectId,
         projectName: p.project?.name,
@@ -79,19 +83,21 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.user.findUnique({ where: { email } })
   const name = typeof body?.name === 'string' ? body.name.trim() : null
   const accesses = Array.isArray(body?.projectAccesses) ? (body.projectAccesses as AccessInput[]) : []
+  const workspaceRole: WorkspaceRoleInput = body?.workspaceRole === 'ADMIN' ? 'ADMIN' : 'MEMBER'
   const permissionsInput = body?.permissions || {}
-  const created = await prisma.user.create({
-    data: {
-      name,
-      email,
-    },
-  })
+  const adminState = await getWorkspaceAdminState(user.id, workspaceId)
+  if (workspaceRole === 'ADMIN' && !adminState.isWorkspaceAdmin) {
+    return Response.json({ error: 'Only workspace admins can assign admin access' }, { status: 403 })
+  }
   const allowedProjects = await prisma.project.findMany({
     where: { teamId: workspaceId },
     select: { id: true, name: true },
   })
   const allowedMap = new Map(allowedProjects.map((p) => [p.id, p.name]))
   const buildAccessPayload = (userId: string) =>
+    workspaceRole === 'ADMIN'
+      ? []
+      :
     accesses
       .filter(
         (a) =>
@@ -120,7 +126,7 @@ export async function POST(req: NextRequest) {
       await prisma.projectAccess.createMany({ data: updatedAccesses, skipDuplicates: true })
     }
     await prisma.membership.create({
-      data: { teamId: workspaceId, userId: existing.id, role: 'MEMBER' },
+      data: { teamId: workspaceId, userId: existing.id, role: workspaceRole },
     })
     await prisma.userPermission.upsert({
       where: { userId: existing.id },
@@ -139,7 +145,9 @@ export async function POST(req: NextRequest) {
       },
     })
     if (existing.email) {
-      const assignedNames = updatedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
+      const assignedNames = workspaceRole === 'ADMIN'
+        ? allowedProjects.map((project) => project.name)
+        : updatedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
       try {
         await sendWorkspaceInviteEmail({
           to: existing.email,
@@ -155,6 +163,13 @@ export async function POST(req: NextRequest) {
     return Response.json({ id: existing.id, invited: true }, { status: 200 })
   }
 
+  const created = await prisma.user.create({
+    data: {
+      name,
+      email,
+    },
+  })
+
   const cleanedAccesses = buildAccessPayload(created.id)
   if (cleanedAccesses.length) {
     await prisma.projectAccess.createMany({ data: cleanedAccesses })
@@ -163,7 +178,7 @@ export async function POST(req: NextRequest) {
   await prisma.membership.upsert({
     where: { teamId_userId: { teamId: workspaceId, userId: created.id } },
     update: {},
-    create: { teamId: workspaceId, userId: created.id, role: 'MEMBER' },
+    create: { teamId: workspaceId, userId: created.id, role: workspaceRole },
   })
 
   await prisma.userPermission.upsert({
@@ -183,7 +198,9 @@ export async function POST(req: NextRequest) {
     },
   })
   if (created.email) {
-    const assignedNames = cleanedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
+    const assignedNames = workspaceRole === 'ADMIN'
+      ? allowedProjects.map((project) => project.name)
+      : cleanedAccesses.map((a) => allowedMap.get(a.projectId)).filter(Boolean) as string[]
     try {
       await sendWorkspaceInviteEmail({
         to: created.email,
