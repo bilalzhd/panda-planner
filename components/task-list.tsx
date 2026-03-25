@@ -2,7 +2,7 @@
 import { Task, TaskPriority, TaskStatus } from '@prisma/client'
 
 type TaskExtras = Task & {
-  assignedTo?: { id: string; name: string | null; email: string | null; image: string | null } | null
+  assignedTo?: { id: string; name: string | null; email: string | null; image: string | null }[]
   timesheets?: { hours: any }[]
 }
 
@@ -27,12 +27,13 @@ export function TaskList({ tasks }: { tasks: TaskExtras[] }) {
       <ul className="divide-y divide-white/10">
         {rows.map((t) => {
           const total = (t.timesheets || []).reduce((acc, x) => acc + Number(x.hours || 0), 0)
+          const assigneeLabel = (t.assignedTo || []).map((assignee) => assignee.name || assignee.email || 'User').join(', ')
           return (
             <li key={t.id} className="grid grid-cols-12 items-center px-3 py-2 hover:bg-white/5">
               <div className="col-span-5 truncate">
                 <div className="text-sm font-medium">{t.title}</div>
-                {t.assignedTo && (
-                  <div className="text-[11px] text-white/60">{t.assignedTo.name || t.assignedTo.email}</div>
+                {assigneeLabel && (
+                  <div className="text-[11px] text-white/60">{assigneeLabel}</div>
                 )}
               </div>
               <div className="col-span-2 text-xs">

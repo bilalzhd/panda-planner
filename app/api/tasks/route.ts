@@ -3,6 +3,7 @@ import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
 import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { sendTaskAssignedEmail } from '@/lib/email'
+import { normalizeAssignedUserIds } from '@/lib/task-assignees'
 
 export async function GET(req: NextRequest) {
   const { user, workspaceId } = await requireUser()
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     where: {
       project: projectWhere,
       projectId,
-      assignedToId,
+      assignedTo: assignedToId ? { some: { id: assignedToId } } : undefined,
       status: status as any,
     },
     include: { project: true, assignedTo: true, createdBy: true },
@@ -43,18 +44,32 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Read-only access' }, { status: 403 })
   }
   const { dueDate, ...rest } = parsed.data
-  // If no assignee provided (e.g., quick add), assign to the creator by default
-  const assignedToId = rest.assignedToId ?? user.id
+  const { ids: assignedToIds } = normalizeAssignedUserIds(rest, {
+    fallbackUserId: user.id,
+    treatMissingAsFallback: true,
+  })
   const task = await prisma.task.create({
-    data: { ...rest, assignedToId, createdById: user.id, dueDate: dueDate ? new Date(dueDate) : null },
+    data: {
+      projectId: rest.projectId,
+      title: rest.title,
+      description: rest.description,
+      recurring: rest.recurring,
+      frequency: rest.frequency,
+      interval: rest.interval,
+      byWeekday: rest.byWeekday,
+      priority: rest.priority,
+      status: rest.status,
+      createdById: user.id,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      assignedTo: assignedToIds.length ? { connect: assignedToIds.map((id) => ({ id })) } : undefined,
+    },
     include: { project: true, assignedTo: true, createdBy: true },
   })
-  // Notify the assignee if it's someone other than the creator and we have their email
-  if (task.assignedTo?.email && task.assignedToId && task.assignedToId !== user.id) {
+  for (const assignee of task.assignedTo) {
+    if (!assignee.email || assignee.id === user.id) continue
     try {
-      await sendTaskAssignedEmail({ to: task.assignedTo.email, task })
+      await sendTaskAssignedEmail({ to: assignee.email, task })
     } catch (e) {
-      // Swallow email errors to not block task creation
       console.error('Failed to send assignment email:', e)
     }
   }

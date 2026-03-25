@@ -43,7 +43,9 @@ async function main() {
       projectId: project.id,
       title: 'Check Google Ads every Monday',
       description: 'Review campaigns, adjust bids, and report anomalies.',
-      assignedToId: user.id,
+      assignedTo: {
+        connect: [{ id: user.id }],
+      },
       priority: TaskPriority.MEDIUM,
       status: TaskStatus.TODO,
       recurring: true,

@@ -14,11 +14,10 @@ type TaskLite = {
   id: string
   title: string
   description?: string | null
-  status: 'TODO' | 'IN_PROGRESS' | 'DONE'
+  status: 'TODO' | 'IN_PROGRESS' | 'CLIENT_REVIEW' | 'DONE'
   priority: 'LOW' | 'MEDIUM' | 'HIGH'
   dueDate?: string | Date | null
-  assignedToId?: string | null
-  assignedTo?: UserLite | null
+  assignedTo?: UserLite[]
   timesheets?: { hours: any }[]
 }
 

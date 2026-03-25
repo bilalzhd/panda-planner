@@ -5,6 +5,7 @@ import { ProjectTabs } from '@/components/project-tabs'
 import { DeleteProject } from '@/components/delete-project'
 import { EditableProjectTitle } from '@/components/editable-project-title'
 import { ArchiveProject } from '@/components/archive-project'
+import { assignmentRank } from '@/lib/task-assignees'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,15 +60,14 @@ export default async function ProjectPage({ params, searchParams }: { params: { 
   const startOfToday = new Date(new Date().toDateString())
   const isArchived = !!project.archivedAt
   const prRank = (p?: string | null) => (p === 'HIGH' ? 0 : p === 'MEDIUM' ? 1 : 2)
-  const ownRank = (t: any) => (t.assignedToId === user.id ? 0 : 1)
   const overdueAll = (project.tasks as any[])
     .filter((t) => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < startOfToday)
     .sort((a, b) => {
       const pa = prRank(a.priority)
       const pb = prRank(b.priority)
       if (pa !== pb) return pa - pb
-      const oa = ownRank(a)
-      const ob = ownRank(b)
+      const oa = assignmentRank(a, user.id)
+      const ob = assignmentRank(b, user.id)
       if (oa !== ob) return oa - ob
       return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()
     })

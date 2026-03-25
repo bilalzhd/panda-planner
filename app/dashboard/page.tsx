@@ -4,6 +4,7 @@ import { TaskCard } from '@/components/task-card'
 import { KanbanBoard } from '@/components/kanban-board'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
 import { Progress } from '@/components/ui/progress'
+import { assignmentRank, isAssignedToUser } from '@/lib/task-assignees'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,9 +21,14 @@ async function getData() {
           lt: new Date(new Date().setDate(new Date().getDate() + 1)),
         },
       },
+      include: { assignedTo: true },
       orderBy: { dueDate: 'asc' },
     }),
-    prisma.task.findMany({ where: { project: projectWhere }, orderBy: { createdAt: 'desc' } }),
+    prisma.task.findMany({
+      where: { project: projectWhere },
+      include: { assignedTo: true },
+      orderBy: { createdAt: 'desc' },
+    }),
     prisma.timesheet.findMany({ where: { task: { project: projectWhere } } }),
   ])
   return { projects, tasksToday, allTasks, timesheets, user }
@@ -36,7 +42,7 @@ export default async function DashboardPage() {
   // Your upcoming = your non-done tasks with dueDate today or later
   const prRank = (p?: string | null) => (p === 'HIGH' ? 0 : p === 'MEDIUM' ? 1 : 2)
   const yourUpcoming = allTasks
-    .filter((t) => t.assignedToId === user.id && t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) >= startOfToday)
+    .filter((t) => isAssignedToUser(t, user.id) && t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) >= startOfToday)
     .sort((a, b) => {
       const pa = prRank((a as any).priority)
       const pb = prRank((b as any).priority)
@@ -44,7 +50,7 @@ export default async function DashboardPage() {
       return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()
     })
   const overdueYours = allTasks
-    .filter((t) => t.assignedToId === user.id && t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < startOfToday)
+    .filter((t) => isAssignedToUser(t, user.id) && t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < startOfToday)
     .sort((a, b) => {
       const pa = prRank((a as any).priority)
       const pb = prRank((b as any).priority)
@@ -126,9 +132,8 @@ export default async function DashboardPage() {
                       const pa = prRank((a as any).priority)
                       const pb = prRank((b as any).priority)
                       if (pa !== pb) return pa - pb
-                      const ownRank = (t: any) => (t.assignedToId === user.id ? 0 : t.assignedToId == null ? 1 : 2)
-                      const ra = ownRank(a)
-                      const rb = ownRank(b)
+                      const ra = assignmentRank(a as any, user.id)
+                      const rb = assignmentRank(b as any, user.id)
                       if (ra !== rb) return ra - rb
                       // Secondary: earlier due dates first
                       return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()

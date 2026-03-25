@@ -18,6 +18,7 @@ export const taskSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional().nullable(),
   assignedToId: z.string().cuid().optional().nullable(),
+  assignedToIds: z.array(z.string().cuid()).optional().nullable(),
   dueDate: z.string().datetime().optional().nullable(),
   recurring: z.boolean().optional(),
   frequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']).optional().nullable(),

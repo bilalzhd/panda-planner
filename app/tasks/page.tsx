@@ -10,7 +10,7 @@ async function getTasks(status?: string) {
   const projectWhere = await projectWhereForUser(user.id)
   return prisma.task.findMany({
     where: { project: projectWhere, status: status as any || undefined },
-    include: { project: true },
+    include: { project: true, assignedTo: true },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
   })
 }
@@ -31,6 +31,11 @@ export default async function TasksPage({ searchParams }: { searchParams: { stat
             </CardHeader>
             <CardContent>
               <div className="text-xs text-white/60">Project: {t.project.name}</div>
+              {t.assignedTo.length > 0 && (
+                <div className="text-xs text-white/60">
+                  Assigned: {t.assignedTo.map((assignee) => assignee.name || assignee.email || 'User').join(', ')}
+                </div>
+              )}
               {t.dueDate && <div className="text-xs text-white/60">Due {new Date(t.dueDate).toLocaleDateString()}</div>}
             </CardContent>
           </Card>

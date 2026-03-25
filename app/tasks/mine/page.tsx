@@ -9,7 +9,7 @@ async function getMyTasks() {
   const { user } = await requireUser()
   const projectWhere = await projectWhereForUser(user.id)
   const tasks = await prisma.task.findMany({
-    where: { project: projectWhere, assignedToId: user.id },
+    where: { project: projectWhere, assignedTo: { some: { id: user.id } } },
     include: { project: true, assignedTo: true, timesheets: true },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
   })

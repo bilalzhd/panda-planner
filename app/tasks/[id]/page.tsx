@@ -80,6 +80,9 @@ async function updateStatus(data: FormData) {
 
 export default async function TaskPage({ params }: { params: { id: string } }) {
   const task = await getTask(params.id)
+  const assigneeNames = task.assignedTo
+    .map((assignee) => assignee.name || assignee.email || 'User')
+    .join(', ')
   return (
     <div className="space-y-6">
       <div>
@@ -105,6 +108,7 @@ export default async function TaskPage({ params }: { params: { id: string } }) {
           {task.createdBy && (
             <div className="text-xs text-white/60 mb-1">Added by {task.createdBy.name || task.createdBy.email}</div>
           )}
+          <div className="text-sm text-white/60">{task.assignedTo.length ? `Assigned to ${assigneeNames}` : 'Unassigned'}</div>
           {task.dueDate && <div className="text-sm text-white/60">Due {new Date(task.dueDate).toLocaleDateString()}</div>}
         </CardContent>
       </Card>

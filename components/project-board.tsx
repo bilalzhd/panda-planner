@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogFooter, DialogHeader } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select } from '@/components/ui/select'
 import { useRouter } from 'next/navigation'
 
 type UserMini = { id: string; name: string | null; email: string | null; image: string | null }
 type TaskExtras = Task & {
-  assignedTo?: UserMini | null
+  assignedTo?: UserMini[]
   createdBy?: UserMini | null
   timesheets?: { hours: any }[]
 }
@@ -31,7 +30,7 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [due, setDue] = useState('')
-  const [assignedToId, setAssignedToId] = useState<string>('')
+  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
   const [users, setUsers] = useState<{ id: string; name: string | null; email: string | null; image: string | null }[]>([])
 
@@ -91,7 +90,7 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
         priority,
         status: 'TODO',
         dueDate: due ? new Date(due).toISOString() : undefined,
-        assignedToId: assignedToId || undefined,
+        assignedToIds,
       }),
     })
     setCreating(false)
@@ -103,7 +102,7 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
       setDescription('')
       setPriority('MEDIUM')
       setDue('')
-      setAssignedToId('')
+      setAssignedToIds([])
       startTransition(() => router.refresh())
     }
   }
@@ -133,8 +132,27 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
   }, [tasks])
 
   function openEdit(task: TaskExtras) {
-    setSelected(task)
+    setSelected({ ...task, assignedTo: task.assignedTo || [] })
     setEditOpen(true)
+  }
+
+  function toggleCreateAssignee(userId: string) {
+    setAssignedToIds((prev) => (
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    ))
+  }
+
+  function toggleSelectedAssignee(userId: string) {
+    if (!selected) return
+    const current = selected.assignedTo || []
+    const exists = current.some((assignee) => assignee.id === userId)
+    if (exists) {
+      setSelected({ ...selected, assignedTo: current.filter((assignee) => assignee.id !== userId) })
+      return
+    }
+    const userToAdd = users.find((user) => user.id === userId)
+    if (!userToAdd) return
+    setSelected({ ...selected, assignedTo: [...current, userToAdd] })
   }
 
   async function saveEdit() {
@@ -149,7 +167,7 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
         priority: selected.priority,
         status: selected.status,
         dueDate: selected.dueDate ? new Date(selected.dueDate).toISOString() : undefined,
-        assignedToId: selected.assignedTo?.id || null,
+        assignedToIds: (selected.assignedTo || []).map((assignee) => assignee.id),
       }),
     })
     setSaving(false)
@@ -215,24 +233,19 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm text-white/80">
             Priority
-            <Select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
+            <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)} className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-white/20">
               <option value="LOW">LOW</option>
               <option value="MEDIUM">MEDIUM</option>
               <option value="HIGH">HIGH</option>
-            </Select>
+            </select>
           </label>
           <label className="text-sm text-white/80">
             Due Date
             <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </label>
           <label className="text-sm text-white/80 col-span-2">
-            Assignee
-            <Select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)}>
-              <option value="">Unassigned</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>{u.name || u.email}</option>
-              ))}
-            </Select>
+            Assignees
+            <AssigneePicker users={users} selectedIds={assignedToIds} onToggle={toggleCreateAssignee} />
           </label>
         </div>
         </div>
@@ -253,33 +266,32 @@ export function ProjectBoard({ projectId, initialTasks, readOnly = false, showCl
             <div className="grid grid-cols-2 gap-2">
               <label className="text-sm text-white/80">
                 Status
-                <Select value={selected.status} onChange={(e) => setSelected({ ...selected, status: e.target.value as TaskStatus })}>
+                <select value={selected.status} onChange={(e) => setSelected({ ...selected, status: e.target.value as TaskStatus })} className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-white/20">
                   <option value="TODO">TODO</option>
                   <option value="IN_PROGRESS">IN_PROGRESS</option>
                   <option value="CLIENT_REVIEW">CLIENT_REVIEW</option>
                   <option value="DONE">DONE</option>
-                </Select>
+                </select>
               </label>
               <label className="text-sm text-white/80">
                 Priority
-                <Select value={selected.priority} onChange={(e) => setSelected({ ...selected, priority: e.target.value as TaskPriority })}>
+                <select value={selected.priority} onChange={(e) => setSelected({ ...selected, priority: e.target.value as TaskPriority })} className="flex h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-white/20">
                   <option value="LOW">LOW</option>
                   <option value="MEDIUM">MEDIUM</option>
                   <option value="HIGH">HIGH</option>
-                </Select>
+                </select>
               </label>
               <label className="text-sm text-white/80">
                 Due Date
                 <Input type="date" value={selected.dueDate ? new Date(selected.dueDate).toISOString().slice(0,10) : ''} onChange={(e) => setSelected({ ...selected, dueDate: e.target.value ? new Date(e.target.value) as any : null })} />
               </label>
-              <label className="text-sm text-white/80">
-                Assignee
-                <Select value={selected.assignedTo?.id || ''} onChange={(e) => setSelected({ ...selected, assignedTo: { ...(selected.assignedTo || {}), id: e.target.value } as any })}>
-                  <option value="">Unassigned</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name || u.email}</option>
-                  ))}
-                </Select>
+              <label className="text-sm text-white/80 col-span-2">
+                Assignees
+                <AssigneePicker
+                  users={users}
+                  selectedIds={(selected.assignedTo || []).map((assignee) => assignee.id)}
+                  onToggle={toggleSelectedAssignee}
+                />
               </label>
             </div>
           </div>
@@ -412,12 +424,7 @@ function TaskRow({ task, onDeleted, readOnly }: { task: TaskExtras; onDeleted?: 
   const totalHours = (task.timesheets || []).reduce((acc, t) => acc + Number(t.hours || 0), 0)
   const [drag, setDrag] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const initials = useMemo(() => {
-    const n = task.assignedTo?.name || task.assignedTo?.email || ''
-    const parts = n.split(' ')
-    const i = (parts[0]?.[0] || '') + (parts[1]?.[0] || '')
-    return i.toUpperCase() || 'U'
-  }, [task.assignedTo])
+  const assignees = task.assignedTo || []
 
   return (
     <div
@@ -454,10 +461,10 @@ function TaskRow({ task, onDeleted, readOnly }: { task: TaskExtras; onDeleted?: 
                 by {task.createdBy.name || task.createdBy.email}
               </span>
             )*/}
-            {task.assignedTo?.image ? (
-              <img src={task.assignedTo.image} alt={task.assignedTo.name || 'User'} className="h-5 w-5 rounded-full object-cover" />
+            {assignees.length > 0 ? (
+              <AssigneeStack assignees={assignees} />
             ) : (
-              <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">{initials}</span>
+              <span className="text-[10px] text-white/50">Unassigned</span>
             )}
             {!readOnly && (
             <button
@@ -509,6 +516,187 @@ function TaskRow({ task, onDeleted, readOnly }: { task: TaskExtras; onDeleted?: 
       </div>
     </div>
   )
+}
+
+function AssigneePicker({ users, selectedIds, onToggle }: {
+  users: UserMini[]
+  selectedIds: string[]
+  onToggle: (userId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const searchRef = useRef<HTMLInputElement | null>(null)
+  const selectedUsers = useMemo(
+    () => users.filter((user) => selectedIds.includes(user.id)),
+    [users, selectedIds],
+  )
+  const filteredUsers = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return users
+    return users.filter((user) => {
+      const label = userLabel(user).toLowerCase()
+      const email = (user.email || '').toLowerCase()
+      return label.includes(q) || email.includes(q)
+    })
+  }, [users, query])
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    searchRef.current?.focus()
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative mt-1">
+      <button
+        type="button"
+        className="flex min-h-9 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-white/20"
+        onClick={() => {
+          setOpen((value) => {
+            const next = !value
+            if (!next) setQuery('')
+            return next
+          })
+        }}
+      >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {selectedUsers.length === 0 && (
+            <span className="text-white/50">Select assignees...</span>
+          )}
+          {selectedUsers.slice(0, 2).map((user) => (
+            <span key={user.id} className="max-w-full truncate rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-white/80">
+              {userLabel(user)}
+            </span>
+          ))}
+          {selectedUsers.length > 2 && (
+            <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-xs text-white/70">
+              +{selectedUsers.length - 2} more
+            </span>
+          )}
+        </span>
+        <span className="ml-3 text-xs text-white/50">{open ? 'Close' : 'Search'}</span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 rounded-lg border border-white/10 bg-[#12151b] p-2 shadow-xl">
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search team members..."
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setOpen(false)
+                setQuery('')
+              }
+            }}
+          />
+          <div className="mt-2 max-h-48 space-y-1 overflow-y-auto">
+            {filteredUsers.map((user) => {
+              const checked = selectedIds.includes(user.id)
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm ${checked ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'}`}
+                  onClick={() => onToggle(user.id)}
+                >
+                  <span className="min-w-0 truncate">{userLabel(user)}</span>
+                  <span className={`ml-3 text-xs ${checked ? 'text-emerald-300' : 'text-white/35'}`}>
+                    {checked ? 'Selected' : 'Add'}
+                  </span>
+                </button>
+              )
+            })}
+            {filteredUsers.length === 0 && (
+              <div className="px-2 py-2 text-sm text-white/50">No matching team members.</div>
+            )}
+            {users.length === 0 && (
+              <div className="px-2 py-2 text-sm text-white/50">No team members available.</div>
+            )}
+          </div>
+          {selectedUsers.length > 0 && (
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                className="text-xs text-white/60 hover:text-white"
+                onClick={() => {
+                  selectedIds.forEach((id) => onToggle(id))
+                  setQuery('')
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedUsers.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedUsers.map((user) => (
+            <button
+              key={user.id}
+              type="button"
+              className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/80 hover:bg-white/10"
+              onClick={() => onToggle(user.id)}
+              title="Remove assignee"
+            >
+              {userLabel(user)} ×
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssigneeStack({ assignees }: { assignees: UserMini[] }) {
+  return (
+    <div className="flex items-center">
+      {assignees.slice(0, 3).map((assignee, index) => (
+        <span
+          key={assignee.id}
+          className="-ml-1 first:ml-0 flex h-5 w-5 shrink-0 overflow-hidden rounded-full"
+          style={{ zIndex: assignees.length - index }}
+          title={userLabel(assignee)}
+        >
+          {assignee.image ? (
+            <img src={assignee.image} alt={assignee.name || 'User'} className="block h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center bg-white/20 text-[10px]">
+              {userInitials(assignee)}
+            </span>
+          )}
+        </span>
+      ))}
+      {assignees.length > 3 && (
+        <span className="ml-1 text-[10px] text-white/60">+{assignees.length - 3}</span>
+      )}
+    </div>
+  )
+}
+
+function userLabel(user: UserMini) {
+  return user.name || user.email || 'User'
+}
+
+function userInitials(user: UserMini) {
+  const parts = userLabel(user).split(' ')
+  const initials = (parts[0]?.[0] || '') + (parts[1]?.[0] || '')
+  return initials.toUpperCase() || 'U'
 }
 
 function friendly(s: TaskStatus) {

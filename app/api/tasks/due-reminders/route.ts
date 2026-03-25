@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     where: {
       dueDate: { gte: startOfDay, lte: endOfDay },
       status: { not: TaskStatus.DONE },
-      assignedTo: { email: { not: null } },
+      assignedTo: { some: { email: { not: null } } },
     },
     include: {
       assignedTo: true,
@@ -46,16 +46,18 @@ export async function POST(req: NextRequest) {
   const errors: { taskId: string; error: string }[] = []
 
   for (const task of tasks) {
-    if (!task.assignedTo?.email) continue
-    try {
-      await sendTaskDueReminderEmail({
-        to: task.assignedTo.email,
-        task,
-      })
-      notified += 1
-    } catch (err) {
-      console.error('Failed to send due reminder email', err)
-      errors.push({ taskId: task.id, error: err instanceof Error ? err.message : 'unknown error' })
+    for (const assignee of task.assignedTo) {
+      if (!assignee.email) continue
+      try {
+        await sendTaskDueReminderEmail({
+          to: assignee.email,
+          task,
+        })
+        notified += 1
+      } catch (err) {
+        console.error('Failed to send due reminder email', err)
+        errors.push({ taskId: task.id, error: err instanceof Error ? err.message : 'unknown error' })
+      }
     }
   }
 

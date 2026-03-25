@@ -42,9 +42,9 @@ export default async function TeamPage() {
         </CardContent>
       </Card>
 
-      <ul className="space-y-4">
+  <ul className="space-y-4">
         {members.map((m) => {
-          const myTasks = tasks.filter((t) => t.assignedToId === m.userId)
+          const myTasks = tasks.filter((t) => t.assignedTo.some((assignee) => assignee.id === m.userId))
           return (
             <li key={m.id} className="rounded-lg border border-white/10 bg-white/5 p-4">
               <div className="flex items-start justify-between">

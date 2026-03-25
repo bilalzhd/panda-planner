@@ -3,6 +3,7 @@ import { taskSchema } from '@/lib/validators'
 import { NextRequest } from 'next/server'
 import { requireUser, projectWhereForUser, ensureProjectPermission } from '@/lib/tenant'
 import { sendTaskAssignedEmail, sendTaskStatusChangedEmail } from '@/lib/email'
+import { getAssignedUserIds, normalizeAssignedUserIds } from '@/lib/task-assignees'
 
 type Params = { params: { id: string } }
 
@@ -26,25 +27,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return Response.json({ error: 'Select a workspace first' }, { status: 400 })
   }
   const projectWhere = await projectWhereForUser(user.id)
-  const existing = await prisma.task.findFirst({ where: { id: params.id, project: projectWhere }, include: { project: true } })
+  const existing = await prisma.task.findFirst({
+    where: { id: params.id, project: projectWhere },
+    include: { project: true, assignedTo: true },
+  })
   if (!existing) return Response.json({ error: 'Not found' }, { status: 404 })
   const body = await req.json()
   const parsed = taskSchema.partial().safeParse(body)
   if (!parsed.success) return Response.json({ error: parsed.error.format() }, { status: 400 })
-  const { dueDate, ...rest } = parsed.data
+  const { dueDate, assignedToId: _assignedToId, assignedToIds: _assignedToIds, ...rest } = parsed.data
   const canEdit = await ensureProjectPermission(user, existing.projectId, 'EDIT')
   if (!canEdit) return Response.json({ error: 'Read-only access' }, { status: 403 })
+  const { ids: nextAssignedToIds, provided: assigneesProvided } = normalizeAssignedUserIds(parsed.data)
   const statusChanged = typeof rest.status !== 'undefined' && rest.status !== existing.status && typeof rest.status === 'string'
   const task = await prisma.task.update({
     where: { id: params.id },
-    data: { ...rest, dueDate: dueDate ? new Date(dueDate) : undefined },
+    data: {
+      ...rest,
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      assignedTo: assigneesProvided ? { set: nextAssignedToIds.map((id) => ({ id })) } : undefined,
+    },
     include: { project: true, assignedTo: true, createdBy: true, comments: { include: { author: true } }, attachments: true, timesheets: true },
   })
-  // If assignment changed to a new user, notify them (but not on self-assign)
-  if (typeof rest.assignedToId !== 'undefined' && rest.assignedToId && rest.assignedToId !== existing.assignedToId) {
-    if (task.assignedTo?.email && rest.assignedToId !== user.id) {
+  if (assigneesProvided) {
+    const previousAssigneeIds = new Set(getAssignedUserIds(existing))
+    for (const assignee of task.assignedTo) {
+      if (!assignee.email || assignee.id === user.id || previousAssigneeIds.has(assignee.id)) continue
       try {
-        await sendTaskAssignedEmail({ to: task.assignedTo.email, task })
+        await sendTaskAssignedEmail({ to: assignee.email, task })
       } catch (e) {
         console.error('Failed to send assignment email:', e)
       }

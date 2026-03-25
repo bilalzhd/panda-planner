@@ -3,10 +3,15 @@ import { Task, TaskStatus } from '@prisma/client'
 import { TaskCard } from '@/components/task-card'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
+import { assignmentRank } from '@/lib/task-assignees'
+
+type TaskWithAssignees = Task & {
+  assignedTo?: { id: string; name: string | null; email: string | null; image: string | null }[]
+}
 
 export function KanbanBoard(
   { tasks, currentUserId, limitPerColumn, showViewAllLinks }:
-  { tasks: Task[]; currentUserId?: string; limitPerColumn?: number; showViewAllLinks?: boolean }
+  { tasks: TaskWithAssignees[]; currentUserId?: string; limitPerColumn?: number; showViewAllLinks?: boolean }
 ) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -20,13 +25,12 @@ export function KanbanBoard(
     startTransition(() => router.refresh())
   }
 
-  const sortOwnFirst = (list: Task[]) => {
+  const sortOwnFirst = (list: TaskWithAssignees[]) => {
     if (!currentUserId) return list
     // Sort: current user's tasks first, then unassigned, then others
     return [...list].sort((a, b) => {
-      const rank = (t: Task) => (t.assignedToId === currentUserId ? 0 : t.assignedToId == null ? 1 : 2)
-      const ra = rank(a)
-      const rb = rank(b)
+      const ra = assignmentRank(a, currentUserId)
+      const rb = assignmentRank(b, currentUserId)
       if (ra !== rb) return ra - rb
       // Secondary: most recently updated first to surface fresh items
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()

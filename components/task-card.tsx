@@ -3,13 +3,19 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Task, TaskPriority } from '@prisma/client'
 
-export function TaskCard({ task, projectName }: { task: Task & { projectId: string }, projectName?: string }) {
+type TaskWithAssignees = Task & {
+  projectId: string
+  assignedTo?: { id: string; name: string | null; email: string | null; image: string | null }[]
+}
+
+export function TaskCard({ task, projectName }: { task: TaskWithAssignees, projectName?: string }) {
   const priorityClass: Record<TaskPriority, string> = {
     // Stronger backgrounds for visibility; themed via globals.css for light mode
     HIGH: 'priority-high border border-rose-500/30 bg-rose-500/20 text-rose-200',
     MEDIUM: 'priority-medium border border-amber-500/30 bg-amber-500/20 text-amber-200',
     LOW: 'priority-low border border-emerald-500/30 bg-emerald-500/20 text-emerald-200',
   }
+  const assigneeLabel = (task.assignedTo || []).map((assignee) => assignee.name || assignee.email || 'User').join(', ')
   return (
     <Link className='cursor-pointer' href={`/tasks/${task.id}`} draggable onDragStart={(e) => {
       e.dataTransfer.setData('text/task-id', task.id)
@@ -22,6 +28,9 @@ export function TaskCard({ task, projectName }: { task: Task & { projectId: stri
         </div>
         {projectName && (
           <div className="mt-1 text-xs text-white/50">{projectName}</div>
+        )}
+        {assigneeLabel && (
+          <div className="mt-1 text-xs text-white/60">{assigneeLabel}</div>
         )}
         {task.dueDate && (
           <div className="mt-2 text-xs text-white/60">Due {new Date(task.dueDate).toLocaleDateString()}</div>

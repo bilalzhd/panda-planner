@@ -19,7 +19,7 @@ export default async function TodosPage() {
 
   const [members, tasks, schedules] = await Promise.all([
     prisma.membership.findMany({ where: { teamId }, include: { user: true }, orderBy: { createdAt: 'asc' } }),
-    prisma.task.findMany({ where: { project: { teamId } }, include: { project: true } }),
+    prisma.task.findMany({ where: { project: { teamId } }, include: { project: true, assignedTo: true } }),
     prisma.taskSchedule.findMany({ where: { task: { project: { teamId } } } }),
   ])
 
@@ -37,7 +37,7 @@ export default async function TodosPage() {
   for (const m of members) {
     tasksByUser.set(
       m.userId,
-      tasks.filter((t) => (t.assignedToId === m.userId)) as any
+      tasks.filter((t) => t.assignedTo.some((assignee) => assignee.id === m.userId)) as any
     )
   }
 

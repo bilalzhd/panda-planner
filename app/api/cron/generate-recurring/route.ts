@@ -7,6 +7,7 @@ import { nextDueDate } from '@/lib/recurrence'
 export async function POST() {
   const templates = await prisma.task.findMany({
     where: { recurring: true },
+    include: { assignedTo: { select: { id: true } } },
   })
 
   let created = 0
@@ -33,7 +34,6 @@ export async function POST() {
         projectId: t.projectId,
         title: t.title,
         description: t.description,
-        assignedToId: t.assignedToId,
         dueDate: next,
         recurring: false,
         frequency: null,
@@ -41,6 +41,7 @@ export async function POST() {
         byWeekday: null,
         priority: t.priority,
         status: 'TODO',
+        assignedTo: t.assignedTo.length ? { connect: t.assignedTo.map((assignee) => ({ id: assignee.id })) } : undefined,
       },
     })
     created++
@@ -48,4 +49,3 @@ export async function POST() {
 
   return Response.json({ created })
 }
-
