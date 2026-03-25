@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     include: { project: true, assignedTo: true, createdBy: true },
   })
   for (const assignee of task.assignedTo) {
-    if (!assignee.email || assignee.id === user.id) continue
+    if (!assignee.email) continue
     try {
       await sendTaskAssignedEmail({ to: assignee.email, task })
     } catch (e) {

@@ -52,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (assigneesProvided) {
     const previousAssigneeIds = new Set(getAssignedUserIds(existing))
     for (const assignee of task.assignedTo) {
-      if (!assignee.email || assignee.id === user.id || previousAssigneeIds.has(assignee.id)) continue
+      if (!assignee.email || previousAssigneeIds.has(assignee.id)) continue
       try {
         await sendTaskAssignedEmail({ to: assignee.email, task })
       } catch (e) {
