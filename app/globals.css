@@ -78,6 +78,9 @@ body {
 
 /* Specific dark-bg panels/dialogs */
 .theme-light .bg-\[\#12151b\] { background-color: #ffffff !important; color: #0b0d12 !important; }
+.theme-light .text-amber-200 { color: #92400e !important; }
+.theme-light .text-rose-200 { color: #9f1239 !important; }
+.theme-light .border-rose-500\/30 { border-color: rgba(244, 63, 94, 0.35) !important; }
 
 /* TipTap editor base styles */
 .ProseMirror {

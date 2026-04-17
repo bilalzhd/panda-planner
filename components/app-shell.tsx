@@ -1,5 +1,6 @@
 "use client"
 import { Sidebar } from '@/components/sidebar'
+import { TaskAlerts } from '@/components/task-alerts'
 import { usePathname } from 'next/navigation'
 import { SignedIn } from '@clerk/nextjs'
 
@@ -9,6 +10,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex">
       <SignedIn>
+        {!isLanding && <TaskAlerts />}
         {!isLanding && <Sidebar />}
       </SignedIn>
       <div className="flex-1">{children}</div>
