@@ -369,6 +369,7 @@ model NotificationPreference {
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId             String   @unique
   emailTaskAssigned  Boolean  @default(true)
+  emailTaskDueSoon   Boolean  @default(true)
   emailDirectMessage Boolean  @default(true)
   lastTaskAlertCheckAt DateTime?
   createdAt          DateTime @default(now())

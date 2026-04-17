@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendTaskDueReminderEmail } from '@/lib/email'
 import { TaskStatus } from '@prisma/client'
+import { DUE_SOON_WINDOW_HOURS } from '@/lib/task-alerts'
 
 function getCronSecret() {
   return process.env.CRON_SECRET || process.env.CRON_SECRET_TOKEN || ''
@@ -25,29 +26,40 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date()
-  const startOfDay = new Date(now)
-  startOfDay.setHours(0, 0, 0, 0)
-  const endOfDay = new Date(now)
-  endOfDay.setHours(23, 59, 59, 999)
+  const dueSoonCutoff = new Date(now.getTime() + DUE_SOON_WINDOW_HOURS * 60 * 60 * 1000)
 
   const tasks = await prisma.task.findMany({
     where: {
-      dueDate: { gte: startOfDay, lte: endOfDay },
+      dueDate: { gte: now, lte: dueSoonCutoff },
       status: { not: TaskStatus.DONE },
       assignedTo: { some: { email: { not: null } } },
     },
     include: {
-      assignedTo: true,
+      assignedTo: {
+        include: {
+          notificationPref: {
+            select: {
+              emailTaskDueSoon: true,
+            },
+          },
+        },
+      },
       project: true,
     },
+    orderBy: { dueDate: 'asc' },
   })
 
   let notified = 0
+  let skipped = 0
   const errors: { taskId: string; error: string }[] = []
 
   for (const task of tasks) {
     for (const assignee of task.assignedTo) {
       if (!assignee.email) continue
+      if (assignee.notificationPref?.emailTaskDueSoon === false) {
+        skipped += 1
+        continue
+      }
       try {
         await sendTaskDueReminderEmail({
           to: assignee.email,
@@ -61,7 +73,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return Response.json({ processed: tasks.length, notified, errors })
+  return Response.json({
+    processed: tasks.length,
+    notified,
+    skipped,
+    windowHours: DUE_SOON_WINDOW_HOURS,
+    errors,
+  })
 }
 
 export async function GET(req: NextRequest) {

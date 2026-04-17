@@ -1,8 +1,8 @@
 import { TaskStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireUser, projectWhereForUser } from '@/lib/tenant'
+import { DUE_SOON_WINDOW_HOURS } from '@/lib/task-alerts'
 
-const DUE_SOON_WINDOW_HOURS = 48
 const MAX_DUE_SOON_TASKS = 8
 const MAX_OVERDUE_TASKS = 5
 

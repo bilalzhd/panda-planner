@@ -19,6 +19,7 @@ function NotificationsCard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [emailTaskAssigned, setEmailTaskAssigned] = useState(true)
+  const [emailTaskDueSoon, setEmailTaskDueSoon] = useState(true)
   const [emailDirectMessage, setEmailDirectMessage] = useState(true)
   const [msg, setMsg] = useState('')
   const [note, setNote] = useState('')
@@ -26,14 +27,23 @@ function NotificationsCard() {
   useEffect(() => {
     fetch('/api/settings/notifications')
       .then((r) => r.json())
-      .then((j) => { setEmailTaskAssigned(!!j.emailTaskAssigned); setEmailDirectMessage(!!j.emailDirectMessage); if (j.setupPending) setNote('Notifications are being set up. You can still toggle your preference and try saving again shortly.') })
+      .then((j) => {
+        setEmailTaskAssigned(!!j.emailTaskAssigned)
+        setEmailTaskDueSoon(typeof j.emailTaskDueSoon === 'boolean' ? j.emailTaskDueSoon : true)
+        setEmailDirectMessage(!!j.emailDirectMessage)
+        if (j.setupPending) setNote('Notifications are being set up. You can still toggle your preference and try saving again shortly.')
+      })
       .finally(() => setLoading(false))
   }, [])
 
   async function save() {
     setSaving(true)
     setMsg('')
-    const res = await fetch('/api/settings/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailTaskAssigned, emailDirectMessage }) })
+    const res = await fetch('/api/settings/notifications', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailTaskAssigned, emailTaskDueSoon, emailDirectMessage }),
+    })
     setSaving(false)
     if (!res.ok) {
       const j = await res.json().catch(() => ({}))
@@ -52,6 +62,7 @@ function NotificationsCard() {
       ) : (
         <div className="space-y-3">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailTaskAssigned} onChange={(e) => setEmailTaskAssigned(e.target.checked)} /> Email me when tasks are assigned to me</label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailTaskDueSoon} onChange={(e) => setEmailTaskDueSoon(e.target.checked)} /> Email me when my tasks are due soon</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={emailDirectMessage} onChange={(e) => setEmailDirectMessage(e.target.checked)} /> Email me when I receive direct messages</label>
           <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
           {note && <div className="text-xs text-white/60">{note}</div>}

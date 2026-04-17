@@ -303,15 +303,20 @@ export async function sendTaskDueReminderEmail(args: {
   const from = process.env.EMAIL_FROM || 'noreply@example.com'
   const base = process.env.NEXT_PUBLIC_BASE_URL || ''
   const taskUrl = `${base}/tasks/${task.id}`
-  const due = task?.dueDate ? new Date(task.dueDate).toLocaleDateString() : null
-  const subject = `Reminder: "${task.title}" is due today`
+  const due = task?.dueDate
+    ? new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(task.dueDate))
+    : null
+  const subject = `Reminder: "${task.title}" is due soon`
   const transporter = getTransport()
   try { await transporter.verify() } catch {}
   const html = renderBrandedEmail({
-    title: 'Task Due Today',
-    preheader: `${escapeHtml(task.title)} is due today`,
+    title: 'Task Due Soon',
+    preheader: due ? `${escapeHtml(task.title)} is due by ${escapeHtml(due)}` : `${escapeHtml(task.title)} is due soon`,
     bodyHtml: `
-      <p>This is a reminder that the task <strong>${escapeHtml(task.title)}</strong>${task?.project?.name ? ` in project <strong>${escapeHtml(task.project.name)}</strong>` : ''} is due today.</p>
+      <p>This is a reminder that the task <strong>${escapeHtml(task.title)}</strong>${task?.project?.name ? ` in project <strong>${escapeHtml(task.project.name)}</strong>` : ''} is due soon.</p>
       ${due ? `<p style=\"margin:4px 0\"><strong>Due:</strong> ${escapeHtml(due)}</p>` : ''}
       ${task.status ? `<p style=\"margin:4px 0\"><strong>Current status:</strong> ${escapeHtml(formatTaskStatus(task.status))}</p>` : ''}
       ${task.description ? `<p style=\"margin:16px 0 0 0\"><strong>Description</strong><br />${escapeHtml(task.description)}</p>` : ''}
@@ -320,7 +325,7 @@ export async function sendTaskDueReminderEmail(args: {
   })
 
   const textLines = [
-    `Reminder: the task "${task.title}"${task?.project?.name ? ` in project "${task.project.name}"` : ''} is due today.`,
+    `Reminder: the task "${task.title}"${task?.project?.name ? ` in project "${task.project.name}"` : ''} is due soon.`,
     task.status ? `Current status: ${formatTaskStatus(task.status)}` : undefined,
     due ? `Due: ${due}` : undefined,
     `Open: ${taskUrl}`,
