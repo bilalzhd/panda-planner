@@ -5,6 +5,7 @@ import { ProjectBoard } from '@/components/project-board'
 import { ProjectMedia } from '@/components/project-media'
 import { ProjectNotes } from '@/components/project-notes'
 import { CredentialsPanel } from '@/components/credentials-panel'
+import { SeoPanel } from '@/components/seo-panel'
 import { TaskList } from '@/components/task-list'
 import { InlineEdit } from '@/components/inline-edit'
 // Client invite tabs removed; permissions handled via accessLevel prop.
@@ -74,6 +75,7 @@ export function ProjectTabs({
     { key: 'board', label: 'Board', icon: iconBoard },
     ...(canEdit ? [{ key: 'files', label: 'Files', icon: iconFiles }] : []),
     { key: 'notes', label: 'Notes', icon: iconNotes },
+    { key: 'seo', label: 'SEO', icon: iconSeo },
     ...(canEdit ? [{ key: 'credentials', label: 'Credentials', icon: iconKey }] : []),
   ]), [canEdit])
   const availableKeys = useMemo(() => tabs.map((t) => t.key), [tabs])
@@ -202,6 +204,10 @@ export function ProjectTabs({
         </div>
       )}
 
+      {active === 'seo' && (
+        <SeoPanel projectId={projectId} canEdit={canEdit && !isArchived} />
+      )}
+
       {active === 'files' && (
         <div className="py-4">
           <ProjectMedia projectId={projectId} />
@@ -292,6 +298,13 @@ function healthColor(h: 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK') {
   if (h === 'AT_RISK') return 'text-amber-200'
   return 'text-rose-200'
 }
+
+const iconSeo = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M16 16l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
 
 const iconKey = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

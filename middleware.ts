@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/email/test',
+  '/api/cron/seo-weekly-report', // protected by CRON_SECRET inside the route
   '/uploads(.*)'
 ])
 
