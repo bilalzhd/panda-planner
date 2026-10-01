@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import type { SeoReport } from '@/lib/seo'
 
 function getBrevoTransport() {
   const debug = process.env.EMAIL_DEBUG === 'true'
@@ -350,6 +351,74 @@ export async function sendTaskDueReminderEmail(args: {
     } catch {}
   }
   return result
+}
+
+function seoPos(pos: number | null | undefined) {
+  if (pos === undefined) return '–'
+  if (pos === null) return '>30'
+  return `#${pos}`
+}
+
+function seoChangeCell(change: number | null) {
+  if (change === null) return '<span style="color:#6b7280">new</span>'
+  if (change > 0) return `<span style="color:#059669">▲ ${change}</span>`
+  if (change < 0) return `<span style="color:#dc2626">▼ ${Math.abs(change)}</span>`
+  return '<span style="color:#6b7280">–</span>'
+}
+
+export async function sendSeoReportEmail(args: { to: string[]; report: SeoReport; periodLabel: string }) {
+  const { to, report, periodLabel } = args
+  const from = process.env.EMAIL_FROM || 'noreply@example.com'
+  const base = process.env.NEXT_PUBLIC_BASE_URL || ''
+  const url = `${base}/projects/${report.projectId}?tab=seo`
+  const transporter = getTransport()
+
+  const pagesHtml = report.pages
+    .map((page) => {
+      const rows = page.keywords
+        .map(
+          (k) => `<tr>
+            <td style="padding:4px 8px 4px 0">${k.isPrimary ? '<strong>' : ''}${escapeHtml(k.keyword)}${k.isPrimary ? '</strong>' : ''}</td>
+            <td style="padding:4px 8px;text-align:right">${seoPos(k.from)}</td>
+            <td style="padding:4px 8px;text-align:right">${seoPos(k.to)}</td>
+            <td style="padding:4px 0 4px 8px;text-align:right">${seoChangeCell(k.change)}</td>
+          </tr>`,
+        )
+        .join('')
+      const traffic = `Clicks: ${page.clicks.to ?? '–'}${page.clicks.from != null ? ` (was ${page.clicks.from})` : ''} · Impressions: ${page.impressions.to ?? '–'}${page.impressions.from != null ? ` (was ${page.impressions.from})` : ''}`
+      return `<div style="margin:16px 0 0 0">
+        <div style="font-weight:700;color:#111827">${escapeHtml(page.name)}${page.url ? ` <span style="font-weight:400;color:#6b7280;font-size:12px">${escapeHtml(page.url)}</span>` : ''}</div>
+        ${
+          rows
+            ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:6px 0;font-size:13px">
+          <tr style="color:#6b7280;font-size:12px"><td>Keyword</td><td align="right">Before</td><td align="right">Now</td><td align="right">Change</td></tr>${rows}</table>
+        <div style="color:#6b7280;font-size:12px">${escapeHtml(traffic)}</div>`
+            : '<div style="color:#6b7280;font-size:13px">No checks recorded in this period.</div>'
+        }
+      </div>`
+    })
+    .join('')
+
+  const summary = `<p style="margin:0 0 4px 0"><strong>${report.improved.length}</strong> keyword${report.improved.length === 1 ? '' : 's'} improved, <strong>${report.declined.length}</strong> declined.</p>`
+  const html = renderBrandedEmail({
+    title: `SEO report: ${report.projectName}`,
+    preheader: `${periodLabel} · ${report.improved.length} improved, ${report.declined.length} declined`,
+    bodyHtml: `<p style="margin:0 0 8px 0;color:#6b7280">${escapeHtml(periodLabel)}</p>${summary}${pagesHtml}`,
+    action: { label: 'Open SEO tab', url },
+  })
+  const text = [
+    `SEO report: ${report.projectName} (${periodLabel})`,
+    `${report.improved.length} improved, ${report.declined.length} declined.`,
+    `Open: ${url}`,
+  ].join('\n')
+
+  return transporter.sendMail({
+    from,
+    to,
+    subject: `SEO report: ${report.projectName} (${periodLabel})`,
+    text,
+    html,
+  })
 }
 
 function escapeHtml(s: string) {

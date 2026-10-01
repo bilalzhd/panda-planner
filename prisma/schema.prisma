@@ -61,6 +61,7 @@ model User {
   teamsOwned  Team[]         @relation("TeamOwner")
   memberships Membership[]
   schedules   TaskSchedule[]
+  seoChecks   SeoCheck[]     @relation("SeoChecksBy")
 
   accounts  Account[]
   sessions  Session[]
@@ -85,6 +86,12 @@ model Project {
   credentials  Credential[]
   accesses     ProjectAccess[]
   userMessages UserMessage[]
+  seoPages     SeoPage[]
+  // Weekly SEO report email settings
+  seoReportEnabled     Boolean   @default(false)
+  seoReportDay         Int       @default(1) // 0-6 (Sunday-Saturday), default Monday
+  seoReportExtraEmails String[]  @default([])
+  seoReportLastSentAt  DateTime?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 }
@@ -374,4 +381,54 @@ model NotificationPreference {
   lastTaskAlertCheckAt DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+// A page of a customer's website that we are trying to rank
+model SeoPage {
+  id             String     @id @default(cuid())
+  project        Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  name           String // e.g., "Home", "Services"
+  url            String?
+  primaryKeyword String? // pre-fills new checks
+  sortOrder      Int        @default(0)
+  archivedAt     DateTime?
+  checks         SeoCheck[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([projectId])
+}
+
+// A dated snapshot of a page's rankings and traffic (history is never overwritten)
+model SeoCheck {
+  id          String           @id @default(cuid())
+  page        SeoPage          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId      String
+  checkedAt   DateTime         @default(now())
+  checkedBy   User?            @relation("SeoChecksBy", fields: [checkedById], references: [id], onDelete: SetNull)
+  checkedById String?
+  // Search Console / analytics numbers for the page (entered manually)
+  impressions Int?
+  clicks      Int?
+  adsRunning  Boolean          @default(false)
+  adsNotes    String?
+  notes       String?          @db.Text
+  keywords    SeoKeywordRank[]
+  createdAt   DateTime         @default(now())
+
+  @@index([pageId, checkedAt])
+}
+
+model SeoKeywordRank {
+  id           String   @id @default(cuid())
+  check        SeoCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+  checkId      String
+  keyword      String
+  isPrimary    Boolean  @default(false)
+  position     Int? // null = not in the top 30
+  qualityScore Int? // Google Ads quality score 1-10
+  adRunning    Boolean  @default(false)
+
+  @@index([checkId])
 }
